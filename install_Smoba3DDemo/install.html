@@ -1,16 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>安装应用</title>
+  <title>下载应用</title>
+  <style>
+    .button {
+      display: inline-block;
+      padding: 20px;
+      font-size: 24px;
+      background-color: #4CAF50;
+      color: white;
+      text-decoration: none;
+      border: none;
+      border-radius: 10px;
+    }
+  </style>
 </head>
 <body>
-  <button onclick="installApp()">点击此处安装应用</button>
-
   <script>
-    function installApp() {
-      // 调用itms-services链接
-      window.location.href = "itms-services://?action=download-manifest&url=https://github.com/shoguncao/CDN/raw/master/install_Smoba3DDemo/install.plist";
+    function openDownload() {
+      var userAgent = navigator.userAgent.toLowerCase();
+      
+      // 检查是否在iOS系统浏览器中打开
+      if (userAgent.indexOf('iphone') !== -1 || userAgent.indexOf('ipad') !== -1 || userAgent.indexOf('ipod') !== -1) {
+        // 在iOS系统浏览器中打开，直接调用itms-services链接
+        window.location.href = "itms-services://?action=download-manifest&url=https://github.com/shoguncao/CDN/raw/master/install_Smoba3DDemo/install.plist";
+      } else {
+        // 不在iOS系统浏览器中打开，展示按钮
+        var currentUrl = window.location.href;
+        var button = document.createElement("button");
+        button.innerHTML = "复制下载链接到系统浏览器打开";
+        button.className = "button";
+        button.onclick = function() {
+          // 复制当前页面链接到剪贴板
+          var tempInput = document.createElement("input");
+          tempInput.value = currentUrl;
+          document.body.appendChild(tempInput);
+          tempInput.select();
+          document.execCommand("copy");
+          document.body.removeChild(tempInput);
+          
+          // 提示用户复制成功并打开系统浏览器
+          alert("下载链接已复制到剪贴板，请在系统浏览器中打开");
+        };
+        document.body.appendChild(button);
+      }
     }
+  </script>
+  
+  <script>
+    openDownload();
   </script>
 </body>
 </html>
