@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>安装应用</title>
+</head>
+<body>
+  <button onclick="installApp()">点击此处安装应用</button>
+
+  <script>
+    function installApp() {
+      // 调用itms-services链接
+      window.location.href = "itms-services://?action=download-manifest&url=https://github.com/shoguncao/CDN/raw/master/install_Smoba3DDemo/install.plist";
+    }
+  </script>
+</body>
+</html>
