@@ -27,7 +27,7 @@
     <script async type="text/javascript" src="wasm_demo.js"></script>
     <script>
         document.getElementById('addButton').addEventListener('click', function() {
-            addResutl = Number(document.getElementById('number').innerText) + 1;
+            addResutl = _csg_add_one(Number(document.getElementById('number').innerText));
             document.getElementById('number').innerText = addResutl;
         });
     </script>
