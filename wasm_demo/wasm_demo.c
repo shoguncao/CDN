@@ -6,8 +6,7 @@ extern "C" {
 #endif
     
     int EMSCRIPTEN_KEEPALIVE csg_add_one(int a) {
-        printf("call from %s", __FILE__);
-        return a + 1;
+        return a + 2;
     }
     
 #ifdef __cplusplus
