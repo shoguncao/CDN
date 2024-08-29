@@ -24,12 +24,10 @@
 
     <div id="number">0</div>
     <button id="addButton">调用js接口(+1)</button>
-
-    <script src="wasm_demo.js"></script>
+    <script async type="text/javascript" src="wasm_demo.js"></script>
     <script>
-        // 为按钮添加点击事件
         document.getElementById('addButton').addEventListener('click', function() {
-            addResutl = add(Number(document.getElementById('number').innerText));
+            addResutl = Number(document.getElementById('number').innerText) + 1;
             document.getElementById('number').innerText = addResutl;
         });
     </script>
