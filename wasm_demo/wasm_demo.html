@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字加1示例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        #number {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="number">0</div>
+    <button id="addButton">调用js接口(+1)</button>
+
+    <script src="wasm_demo.js"></script>
+    <script>
+        // 为按钮添加点击事件
+        document.getElementById('addButton').addEventListener('click', function() {
+            addResutl = add(Number(document.getElementById('number').innerText));
+            document.getElementById('number').innerText = addResutl;
+        });
+    </script>
+
+</body>
+</html>
