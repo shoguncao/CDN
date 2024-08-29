@@ -6,7 +6,7 @@ function add(value) {
 }
 
 function callObjcMsgSend() {
-    native_callObjcMsgSend("UIView");
+    native_callObjcMsgSend(6);
 }
 
 // 导出add函数以供外部调用
