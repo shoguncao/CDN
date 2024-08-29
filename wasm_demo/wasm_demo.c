@@ -6,7 +6,7 @@ extern "C" {
 #endif
     
     int EMSCRIPTEN_KEEPALIVE csg_add_one(int a) {
-        return a + 2;
+        return a + 1;
     }
     
 #ifdef __cplusplus
