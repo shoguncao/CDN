@@ -5,5 +5,9 @@ function add(value) {
     return value + 1;
 }
 
+function callObjcMsgSend() {
+    native_callObjcMsgSend();
+}
+
 // 导出add函数以供外部调用
 window.add = add;
