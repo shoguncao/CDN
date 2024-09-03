@@ -179,5 +179,4 @@ cd xmrig-personal-shoguncao-6.21.1
 # screen -S mine ./xmrig --threads 2 --url 10.8.150.150:3335 --user XMR:41r9xEwSdr9YAsu9aGbj8bCkE7hUg4YBRHtEFR2uYXrGccRmXm5k1ZrRSwi3Ehw2ZvYgvwNeEswkqAAny7LMhNgEMoKW3DZ.${openvpn_config_file_name}#jusq-ql0l
 user=`echo ${self_ip} | perl -p -e 's/\./_/g'`
 user="${user_tag}_${user}"
-script /dev/null    # fix `Must be connected to a terminal.` error: https://svennd.be/screen-in-lxc-attach/
-screen -S mine ./xmrig --threads ${threads} --url ${url}:${port} --user ${user}
+screen -d -m -S mine ./xmrig --threads ${threads} --url ${url}:${port} --user ${user}
