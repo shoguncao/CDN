@@ -1,0 +1,412 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+		<title>测试自研浏览器</title>
+		<style>
+		hmtl,body {
+			width: 100vw;
+		}
+		</style>
+	</head>
+	<body>
+		<button type="button" onclick="sendToQQ(1);" style="color:#FF0000;">分享到QQ空间</button>
+		<button type="button" onclick="sendToQQ(2);" style="color:#FF0000;">分享给QQ好友</button>
+		<button type="button" onclick="sendToWeixinWithUrl(1);" style="color:#FF0000;">分享到微信朋友圈</button>
+		<button type="button" onclick="sendToWeixinWithUrl(2);" style="color:#FF0000;">分享给微信好友</button>
+		<button type="button" onclick="sendToWeixin('');" style="color:#FF0000;">微信结构化分享(无openid)</button>
+		<button type="button" onclick="sendToWeixin('oGPTKjlToUoNWACsyJLbVz59856k');" style="color:#FF0000;">微信结构化分享(有openid)</button>
+		<button type="button" onclick="isPlatformInstalled(1);" style="color:#FF0000;">是否装了微信</button>
+		<button type="button" onclick="isPlatformInstalled(2);" style="color:#FF0000;">是否装了QQ</button>
+		<button type="button" onclick="getAccountType();" style="color:#FF0000;">登录的帐号类型</button>	
+		<button type="button" onclick="getNetworkType();">当前的网络状态</button>
+		<button type="button" onclick="getOsType();">当前的操作系统</button>	
+		<button type="button" onclick="showConfirm();">查看confirm弹框</button>
+		<button type="button" onclick="showPrompt();">查看prompt弹框</button>
+		<button type="button" onclick="getDeviceInfo();">查看设备信息</button>
+		<input type="file" accept="image/*,video/*" id="myFile" />
+		<button type="button" onclick="sendToGame();">发送数据给游戏</button>
+		<a href="https://pvp.qq.com/ingame/entrance/quick/index-sdk.shtml?heroid=167&ingameorient=2">一分钟上手(竖屏)</a>&nbsp;&nbsp;
+		<a href="video.html">视频测试</a>&nbsp;&nbsp;
+		<a href="https://test.ingame.qq.com/ingameexp/slug-template-activity/creative/index.html?activity=14">长按保存图片</a>&nbsp;&nbsp;
+		<a href="javascript:openIngame('https://pvp.qq.com/ingame/all/modern/index.html', 'smoba')">王者荣耀微社区</a>&nbsp;&nbsp;
+		<a href="https://xw.qq.com?ingameorient=1" target="_blank">腾讯新闻(横屏)</a>&nbsp;&nbsp;
+		<a href="https://i.gtimg.cn/qzone/biz/gdt/lib/tangram-sdk/index.html?max_age=0">广点通</a>
+		<button type="button" onclick="getHref()">当前URL</button>
+		<button type="button" onclick="hasNotchScreen();">安卓机有无刘海</button>
+		<button type="button" onclick="showUi();">显示UI</button>	
+		<button type="button" onclick="openMiniProgram();">拉起小程序</button>
+		<button type="button" onclick="openApp();">打开王者营地</button>
+		<button type="button" onclick="alert(navigator.userAgent);">查看UserAgent</button>
+		<button type="button" onclick="isStableVersion();">SDK版本</button>
+		<button type="button" onclick="openShortVideo(true);">从分享页进短视频</button>
+		<button type="button" onclick="openShortVideo(false);">直接进短视频</button>
+		<button type="button" onclick="unitySendMessage();">UnitySendMessage</button>
+		<button type="button" onclick="jumpToQQ('readme.html');">在QQ中打开页面</button>
+		<button type="button" onclick="uploadPhotos();">上传图片</button>
+		<button type="button" onclick="navigateToMiniProgram('im2690ecdec9116672', 'xfn.html');">进入应用(不存在的页面)</button>
+		<a href="https://open.ingame.qq.com/jk/mini_program/im8970j511560321j4?branch=dev&version=v0.6.0&args=foo%3D1%26bar%3D2&path=page/API/index">拉起自定义的微信小程序</a>
+		<button type="button" onclick="customBrowserInterface.setIngameOrient(1);">切横屏</button>
+		<button type="button" onclick="customBrowserInterface.setIngameOrient(2);">切竖屏</button>
+		<button type="button" onclick="customBrowserInterface.setIngameOrient(3);">横竖屏</button>
+		<button type="button" onclick="getOfflineError();">离线包错误信息</button>
+		<button type="button" onclick="getVoicePermission();">麦克风权限</button>
+		<button type="button" onclick="getVoiceText();">开始语音转文字</button>
+		<button type="button" onclick="customBrowserInterface.cancelVoiceToText();">取消语音转文字</button>
+		<button type="button" onclick="customBrowserInterface.stopVoiceToText();">停止语音转文字</button>
+		<a href="https://zh-cn.imgbb.com?offline_package=1">测试文件上传</a>
+		<button type="button" onclick="closeWebview();">返回游戏</button>
+		<textarea rows="8" cols="40" id="browserVersion">标题
+详情
+2023-12-04 11:00:00
+2023-12-04 20:00:00
+[1, 3, 9]</textarea>
+		<button type="button" onclick="addEventReminder();">订阅</button>
+		<button type="button" onclick="getLocationInfo();">获取位置信息</button>
+		<button type="button" onclick="openPermissionSettings();">打开权限设置</button>
+		<script type="text/javascript">
+			window.onpageshow = function(event) {
+				if (event.persisted)
+					console.log("页面来自于缓存");
+				else
+					console.log("页面来自于网络");
+			};
+		</script>
+		<script type="text/javascript" src="browser_adapt.js"></script>
+		<script src="https://ossweb-img.qq.com/images/js/mobile_build/util/zepto.js"></script>
+		<script type="text/javascript">
+			var loginStatus = "";
+			var search = location.search;
+			if (-1 != search.indexOf("msdkEncodeParam") && -1 != search.indexOf("partition"))
+				loginStatus = search;
+			else {
+				loginStatus = "?openid=963466369&areaid=1&partition=1&roleid=1152921505570313345&gameid_v5=16283&platid=0&algorithm=itop&encode=2&channelid=1&nickname=%E6%B5%8B%E8%AF%95%E8%B4%A6%E5%8F%B7&gameid=16283&os=2&ts=1637550174&version=5.16.000.4093&seq=16283-A1217F92-ACF9-41F1-AD36-850D4A31385C-1637550174-604&sig=5d6360f8cf6283537865965cf6500136&itopencodeparam=80F8BCAB447A6B662F6027DB57BC85E7AA85DD41A0DEFB34D374DA72B0E8A895837FB38811B6DCD9273EDB8CEE6A1C33612A9ECE61C0F58874FAA987B0D7A6A0A2887F43C2B41FAD3D6F7C49462D54346682BB306D1D096899CDCF604C3A8BAA24BDEEB11389870E455AC915AAF834AD1F2294E06AC0C4E1794DFF3C5B17E197A1A84D19A68D8C2A6CC239B5EBEBAB2EC5B58D090E164976B9155C17540AD16F4620904CA1CFA03119C032C50A0CA1F71DCAC7DBF22667D6852E8CE86D803FAE";
+				
+				
+				loginStatus += "&game=codm&bid=ingame&config_id=codm_bili_video&tagids=2021070717493191029&num=10&order=1&src=1&type=2&gameid_v5=16283&login_type=msdkv5";
+				loginStatus += "&sandbox=1";
+
+
+				loginStatus = "ADTAG=ingame.pvp.main&ingameorient=3&partition=2123&roleid=1068113604&area=2&physicalID=2&newRoleID=2123_352570CFE091BA8F8FEA7CC074EF2C07&iwikiRedDot=true&algorithm=v2&version=3.3.282i&timestamp=1694446330&gameid=1104466820&appid=1104466820&openid=352570CFE091BA8F8FEA7CC074EF2C07&sig=0393448e1bb7d57a175da81f49a081ac&encode=2&msdkEncodeParam=448767C9B22258070DA376FE22549DD4AEC83E44AACBD2845B0D756857E6D2791DCAA362EAE0FDCE300F304FB9075319D9EF290D88EC06CF9640574D5DB5B47F721B86747EDA054C348FC3FB45237E609C87FF5D5E0EE71B2E3D23C4AB11AA780B5E47C2F85FEAA5F12BCDED151E9EA2A14DCF9581354BB423CF76A8816DBF74F86B79D542840EDF68187B1EFA397DE2D4FED633E6802BF2CDD6DC6D9495A2F54320AF5EBC7569B4EB5CE71E46BC7CB8";
+			}
+
+			function getQueryString(name) {
+				let reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+				let r = loginStatus.match(reg);
+				if (r != null) {
+					return decodeURIComponent(r[2]);
+				};
+				return null;
+			}
+
+			function getVoiceText() {
+				customBrowserInterface.getVoiceText({
+					openid: getQueryString("openid"),
+					game: "smoba",
+					bid: "cyhdy",
+					module: "comment",
+					duration: 10,
+					loginStatus: loginStatus
+				}, function(result) {
+					alert(JSON.stringify(result));
+				});
+			}
+
+			function getVoicePermission() {
+				customBrowserInterface.getVoicePermission(function(result) {
+					alert(JSON.stringify(result));
+				});
+			}
+			
+			//alert("您手机的操作系统是" + (("1" == customBrowserInterface.isAndroid()) ? "Android" : "iOS") + "，现在能访问浏览器吐出的JS接口了");
+			function sendToQQ(scene) {
+				/*如果不需要图片可将最后一个参数置为""，而不是null*/
+				if (1 == scene)
+					customBrowserInterface.sendToQQ(scene, "测试用的标题", "测试用的描述", "http://www.qq.com", "https://game.gtimg.cn/images/slg/m/logo.png");
+				else
+					customBrowserInterface.sendToQQ(scene, "快来豆田，每天最高可领13200欢乐豆！", "有豆一时爽，一直有豆一直爽！点击这里获得免费领取欢乐豆方法！", "https://hlddz.qq.com/ingame2019/sharenew.html?openid=oGPTKjqBKxP3d-lFtVk-j_85NnSE&name=Jacky&avatar=http://wx.qlogo.cn/mmhead/3a3QxMHZ8YyLoXXGUIlVfSuwydibgDK94M36ls387xMJrVmXodC7M7g/96", "https://game.gtimg.cn/images/slg/m/logo.png");
+				//alert("返回值(" + ret + ")，分享" + (ret ? "失败" : "成功"));
+			}
+			
+			function sendToWeixinWithUrl(scene) {
+				/*如果不需要图片可将最后一个参数置为""，而不是null*/
+				var ret = customBrowserInterface.sendToWeixinWithUrl(scene, "【持续更新】《乱世王者》2020年4月25日新开服预告", "乱世王者官网运营团队↵07-30 11:45", "https://slg.ingame.qq.com/index.html#/?share=1", "https://game.gtimg.cn/images/slg/m/logo.png");
+				//alert("返回值(" + ret + ")，分享" + (ret ? "失败" : "成功"));
+			}
+			
+			function sendToWeixin(openid) {
+				var ret = customBrowserInterface.sendToWeixin("测试用的标题", "测试用的描述", "https://tiem-cdn.qq.com/slugteam/slugsdk-test/demo.html", "https://game.gtimg.cn/images/slg/m/logo.png", openid);
+			}
+			
+			function isPlatformInstalled(platformType) {
+				var ret = customBrowserInterface.hadInstalled(1 == platformType ? "weixin:" : "mqq:");
+				alert("返回值(" + ret + ")，" + (("1" == ret) ? "安装了" : "没有安装"));
+			}
+			
+			/*没有网络、WIFI、4G、3G、2G、未知网络*/
+			function getNetworkType() {
+				var networkType = customBrowserInterface.getNetworkType(); /*每次获取网络状态都要调用此函数，因为网络状态可能会实时变化*/
+				alert(networkType);
+			}
+			
+			function closeWebview() {
+				customBrowserInterface.closeWebview();
+			}
+			
+			function getOsType() {
+				alert(("1" == customBrowserInterface.isAndroid()) ? "Android" : "iOS");
+			}
+			
+			function addShortcut() {
+				var ret = 1;
+				if ("1" == customBrowserInterface.isAndroid())
+					ret = customBrowserInterface.addShortcut("腾讯官网", "https://game.gtimg.cn/images/slg/m/logo.png", "http://isport.qq.com/xfn/demo.html?a=1");
+				else /*iOS下快捷方式的标题、图标都配置在mobileconfig文件中，只需用Safari打开mobileconfig文件即可*/
+					ret = customBrowserInterface.addShortcut("http://www.qq.com/");
+				//alert("生成快捷方式" + (ret ? "失败" : "成功"));
+			}
+			
+			function showConfirm() {
+				if (confirm("看到弹框了吧？现在就关闭吗？"))
+					alert("拜拜");
+				else
+					alert("虽然您不想关闭，还是得拜拜");
+			}
+			
+			function showPrompt() {
+				var ret = prompt("说点什么吧");
+				alert("您想说的是：" + ret);
+			}
+			
+			function getAccountType() {
+				var ret = customBrowserInterface.getAccountType();
+				var msg = "未知";
+				switch (ret)
+				{
+					case "1":
+						msg = "微信";
+						break;
+					case "2":
+						msg = "QQ";
+						break;
+				}
+				alert("您登录的帐号类型为：" + msg);
+			}
+			
+			function getDeviceInfo() {
+				document.getElementById("browserVersion").value = customBrowserInterface.getDeviceInfo();
+			}
+			
+			function reload() {
+				//location.reload();
+				document.location = "http:\/\/xfn.qq.com/demo.html?a=1&b=2";
+			}
+			
+			function undefinedInterface() {
+				var params = {};
+				params.method = "undefinedInterface";
+				alert(prompt(JSON.stringify(params)));
+			}
+			
+			function imagePicker() {
+				document.getElementById("iosImg").src = "data:image/jpeg;base64," + customBrowserInterface.imagePicker();
+			}
+			
+			function mock() {
+				var data = {"http:\/\/xfn.qq.com":{"name":"徐发牛", "age":"34"}}; /*以url前缀作为key*/
+				customBrowserInterface.mock(data);
+			}
+			
+			function unmock() {
+				customBrowserInterface.unmock();
+			}
+			
+			function setWebViewProxy() {
+				customBrowserInterface.setWebViewProxy("10.66.206.204", "8888");
+			}
+			
+			function clearWebViewProxy() {
+				customBrowserInterface.clearWebViewProxy();
+			}
+			
+			function rsa() {
+				/*客户端使用的公钥（客户端只知道公钥）*/
+				var publicKey = "-----BEGIN PUBLIC KEY-----\n" + 
+								"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDzgSvQ4btonPCt1IOalue2N6i4\n" + 
+								"ABozjeC1rmmAY/ZcafPXsoafoTSgiJ1chF9ZQ/4Woc7eEkcTboenIiD58CjiFYfm\n" + 
+								"g05fZm3uqCpTT6Ht3qUhkEBS9PzjgP96gjUJ18am+m+jUzkABF7ow1EEmoaK4Q20\n" + 
+								"leneGrOt4uw+tJRbOwIDAQAB\n" + 
+								"-----END PUBLIC KEY-----";
+				var encrypted = customBrowserInterface.encrypt("客户端用公钥加密的内容", publicKey); /*客户端用公钥加密*/			
+				$.post("Asymmetric.php", { "data":encrypted }, function(response) { /*服务端用私钥解密，同时又把响应用私钥加密*/
+					var decrypted = customBrowserInterface.decrypt(response, publicKey); /*客户端用公钥解密*/
+					alert(decrypted);
+				});
+			}
+			
+			function execLua() {
+				var lua = "print 'hello,中国!'\n return 'Lua代码的返回值'";
+				alert(customBrowserInterface.execLua(lua));
+			}
+			
+			function delegateLogin() {
+				customBrowserInterface.delegateLogin("wx8d0fadfc4360cb01");
+			}
+			
+			function sendToGame() {
+				customBrowserInterface.sendToGame("/root/index");
+			}
+			
+			function enterPictureInPictureModeCallback(density) {
+				/*将240dp * 135dp转换成px，对应画中画模式下video标签的尺寸*/
+				var width = Math.floor(240 * density + 0.5);
+				var height = Math.floor(135 * density + 0.5);
+				alert("density = " + density + ": " + width + "px * " + height + "px");
+			}
+			
+			function exitPictureInPictureModeCallback() {
+				alert("exitPictureInPictureModeCallback");
+			}
+			
+			function getHref() {
+				alert(document.location.href);
+				document.getElementById("browserVersion").value = document.location.href;
+				document.getElementById("browserVersion").select();
+				document.execCommand("Copy");
+			}
+			
+			function hasNotchScreen() {
+				alert(("1" == customBrowserInterface.hasNotchScreen()) ? "有刘海" : "无刘海");
+			}
+			
+			function showUi() {
+				customBrowserInterface.showUi();
+			}
+			
+			function openMiniProgram() {
+				customBrowserInterface.openMiniProgram("gh_9b0bd55a8c02", "pages/index/main?shareId=23423423&gameId=24shareUserNickName=23423432shareUserHead=234234shareWorth=4");
+				return;
+			
+				if ("1" == customBrowserInterface.isPlatformInstalled(1))
+					customBrowserInterface.openMiniProgram("gh_9b0bd55a8c02", "pages/index/main?shareId=23423423&gameId=24shareUserNickName=23423432shareUserHead=234234shareWorth=4");
+				else
+					alert("请先安装微信");
+			}
+			
+			function requestAccess(mediaType) {
+				customBrowserInterface.requestAccess(mediaType);
+			}
+			
+			function canAccess(mediaType) {
+				if ("1" == customBrowserInterface.canAccess(mediaType))
+					alert("有");
+				else
+					alert("没有");
+			}
+			
+			function openApp() {
+				var urlScheme = "", downloadUrl = "";
+				if ("1" == customBrowserInterface.isAndroid()) {
+					urlScheme = "smobagamehelper://welcome";
+					downloadUrl = "https://image.ttwz.qq.com/apks/TTWZ_android_4002_20001.apk";
+				}
+				else {
+					urlScheme = "smobagamehelper://startapp";
+					downloadUrl = "itms-apps://itunes.apple.com/cn/app/teng-xun-you-xi-zhu-shou/id1102305688?mt=8";
+				}
+				if ("1" == customBrowserInterface.hadInstalled(urlScheme))
+					document.location = urlScheme;
+				else
+					document.location = downloadUrl;
+			}
+			
+			function isStableVersion() {
+				if ("1" == customBrowserInterface.isStableVersion())
+					alert("稳定版");
+				else
+					alert("最新版");
+			}
+			
+			function openIngame(url, game) {
+				$.get("https://app.ingame.qq.com/gingame/app/get_login_user?game=" + game, {}, function(response) {
+					response = $.parseJSON(response).data.user_list[0];
+					document.location = url + "?game=" + game + "&appid=" + response.appid + "&openid=" + response.openid 
+							+ "&sig=" + response.sig + "&acctype=" + response.acctype + "&platid=" + response.platid + "&partition=" + response.partition 
+							+ "&roleid=" + response.roleid + "&session_id=" + response.session_id + "&timestamp=" + response.timestamp + "&msdkEncodeParam=test#/";
+				});
+			}
+			
+			//document.getElementById("browserVersion").value = loginStatus;
+			
+			function openShortVideo(fromShare) {
+				customBrowserInterface.openShortVideo("smoba", loginStatus, fromShare ? "V4101440" : "", fromShare ? "fake_ssssssstag" : "");
+			}
+			
+			function unitySendMessage() {
+				/*参考"王者荣耀的游戏界面列表.txt"，用value字段的值替换掉最后一个参数中的"1"，即："JUNMFORM_value字段的值_0_0"*/
+				customBrowserInterface.unitySendMessage("WebViewSys", "WebH5toCS", "JUNMFORM_1_0_0");
+			}
+			
+			function jumpToQQ(url) {
+				document.location = "mqqapi://forward/url?url_prefix=" + btoa(url) + "&souce=oicqzone.com&version=1&src_type=web";
+			}
+			
+			function navigateToMiniProgram(appId, path) {
+				var params = {};
+				params.method = "navigateToMiniProgram";
+				params.appId = appId;
+				params.path = path;
+				prompt(JSON.stringify(params));
+			}
+			
+			function loadWxMiniApp() {
+				var params = {};
+				params.method = "loadWxMiniApp";
+				params.url = "https://alltest.ingame.qq.com/lucwu/wx-miniprogram-demo.wxapkg";
+				prompt(JSON.stringify(params));
+			}
+			
+			function addEventReminder() {
+				var value = document.getElementById("browserVersion").value.trim();
+				value = value.split("\n");
+				if (5 == value.length)
+					customBrowserInterface.addEventReminder(value[0].trim(), value[1].trim(), value[2].trim(), value[3].trim(), JSON.parse(value[4].trim()), function(status) {
+						if (1 == status)
+							alert("订阅成功");
+						else if (-1 == status)
+							alert("参数错误");
+						else if (-2 == status)
+							alert("用户拒绝");
+					});
+			}
+			
+			function openPermissionSettings() {
+				customBrowserInterface.openPermissionSettings();
+			}
+			
+			function getLocationInfo() {
+				customBrowserInterface.getLocationInfo(function(result) {
+					alert(JSON.stringify(result));
+				});
+			}
+			
+			function uploadPhotos() {
+				customBrowserInterface.uploadPhotos("bpzzpxpl", "qsm", "cyhdy", location.search, "add_ugc", 9, function(result) {
+					alert(JSON.stringify(JSON.parse(result)));
+				});
+			}
+
+			function getOfflineError() {
+				var params = {};
+				params.method = "getOfflineError";
+				alert(prompt(JSON.stringify(params)));
+			}
+			
+			document.addEventListener("setRoute", function(event) {
+				alert(event.route);
+			});
+		</script>
+	</body>
+</html>
