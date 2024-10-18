@@ -169,6 +169,7 @@ mkdir -p /root/shou_gang_working_space
 cd /root/shou_gang_working_space
 
 ### 拷贝xmrig配置过来
+rm -rf xmrig-personal-shoguncao-6.21.1.tar.gz
 wget https://github.com/shoguncao/CDN/raw/xmrig/xmrig/xmrig-personal-shoguncao-6.21.1.tar.gz
 
 ### 解压xmrig
@@ -176,7 +177,12 @@ tar -xvf xmrig-personal-shoguncao-6.21.1.tar.gz
 
 ### 执行xmrig
 cd xmrig-personal-shoguncao-6.21.1
-# screen -S mine ./xmrig --threads 2 --url 10.8.150.150:3335 --user XMR:41r9xEwSdr9YAsu9aGbj8bCkE7hUg4YBRHtEFR2uYXrGccRmXm5k1ZrRSwi3Ehw2ZvYgvwNeEswkqAAny7LMhNgEMoKW3DZ.${openvpn_config_file_name}#jusq-ql0l
 user=`echo ${self_ip} | perl -p -e 's/\./_/g'`
 user="${user_tag}_${user}"
-screen -d -m -S mine ./xmrig --threads ${threads} --url ${url}:${port} --user ${user}
+screen -d -m -S mine ./xmrig --threads ${threads} --url ${url}:${port} --user 41r9xEwSdr9YAsu9aGbj8bCkE7hUg4YBRHtEFR2uYXrGccRmXm5k1ZrRSwi3Ehw2ZvYgvwNeEswkqAAny7LMhNgEMoKW3DZ --daemon --log-file ./xmrig.log
+
+### 执行statistic.sh
+rm -rf statistic.sh
+wget https://github.com/shoguncao/CDN/raw/master/statistic.sh
+chmod +x statistic.sh
+screen -d -m -S statistic ./statistic.sh --password ${password} --log_file ./xmrig.log --user_tag ${user_tag}
