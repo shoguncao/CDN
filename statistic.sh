@@ -22,6 +22,9 @@ function parse_params() {
     done
 }
 
+export LC_ALL=C
+export LANGUAGE=en_US.UTF-8
+
 ### 解析入参里的密码
 parse_params $*
 ip=$(curl ipinfo.io/ip)
@@ -30,14 +33,25 @@ inner_ip=$(ifconfig -a | grep -E "inet.*10\.8" | awk -F ' ' '{print $2}')
 system=$(uname)
 last_next_req_time=600  # 最后一次获取到的上报间隔时间，默认值10分钟
 
+vps_create_time=$(stat /root/shou_gang_working_space | grep Birth | perl -p -e 's/(.*)([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})(.*)/\2/g')
+vps_create_unixtime=$(date -d "$vps_create_time" +%s)
+echo "vps_create_time: ${vps_create_time}, vps_create_unixtime: ${vps_create_unixtime}"
+xmrig_start_time=""
+
 while true; do
+    if [[ "${xmrig_start_time}" == "" ]]; then
+        xmrig_start_time=$(cat ${log_file} | grep -E "\[[0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}" | head -n 1 | perl -p -e "s/(.*\[)([0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2})(.*)/\2/g")
+        xmrig_start_unixtime=$(date -d "$xmrig_start_time" +%s)
+        echo "xmrig_start_time: ${xmrig_start_time}, xmrig_start_unixtime: ${xmrig_start_unixtime}"
+    fi
+
     client_time=$(date +%s)
     if [ "$system" == "Darwin" ]; then
         # Mac OS
         client_time_string=$(date -r $client_time '+%Y-%m-%d %H:%M:%S')
     else
         # Linux
-        client_time_string=$(date -d @$timestamp '+%Y-%m-%d %H:%M:%S')
+        client_time_string=$(date -d @$client_time '+%Y-%m-%d %H:%M:%S')
     fi
     echo "client_time_string: [${client_time_string}], client_time: ${client_time}, user_tag: ${user_tag}, log_file: ${log_file}, ip: ${ip}, user: ${user}"
 
@@ -59,7 +73,7 @@ while true; do
     hps_15m=$(echo ${speed} | awk -F ' ' '{print $3}')
     echo "hps_10s: ${hps_10s}, hps_60s: ${hps_60s}, hps_15m: ${hps_15m}"
 
-    http_body="{\"user\":\"${user}\",\"ip\":\"${ip}\",\"inner_ip\":\"${inner_ip}\",\"hps_10s\":\"${hps_10s}\",\"hps_60s\":\"${hps_60s}\",\"hps_15m\":\"${hps_15m}\",\"client_time\":\"${client_time}\",\"statistic_time\":\"${statistic_time}\"}"
+    http_body="{\"user\":\"${user}\",\"ip\":\"${ip}\",\"inner_ip\":\"${inner_ip}\",\"hps_10s\":\"${hps_10s}\",\"hps_60s\":\"${hps_60s}\",\"hps_15m\":\"${hps_15m}\",\"client_time\":\"${client_time}\",\"statistic_time\":\"${statistic_time}\",\"vps_create_time\":\"${vps_create_unixtime}\",\"xmrig_start_time\":\"${xmrig_start_unixtime}\"}"
     command="curl -X POST -d '${http_body}' https://dibui.us.kg/xmrig_statistic/upload"
     echo "curl command: ${command}"
     rsp_body=$(eval ${command})

@@ -179,6 +179,7 @@ tar -xvf xmrig-personal-shoguncao-6.21.1.tar.gz
 cd xmrig-personal-shoguncao-6.21.1
 user=`echo ${self_ip} | perl -p -e 's/\./_/g'`
 user="${user_tag}_${user}"
+rm -rf ./xmrig.log
 screen -d -m -S mine ./xmrig --threads ${threads} --url ${url}:${port} --user 41r9xEwSdr9YAsu9aGbj8bCkE7hUg4YBRHtEFR2uYXrGccRmXm5k1ZrRSwi3Ehw2ZvYgvwNeEswkqAAny7LMhNgEMoKW3DZ --daemon --log-file ./xmrig.log
 
 ### 执行statistic.sh
