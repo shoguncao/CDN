@@ -14,7 +14,6 @@ function parse_params() {
             user_tag=${VAR}
             NEXT_VALUE_FOR_OPTION=""
         fi
-        fi
     done
 }
 
