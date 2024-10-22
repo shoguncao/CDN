@@ -57,6 +57,9 @@ vps_create_unixtime=$(date -d "$vps_create_time" +%s)
 echo "vps_create_time: ${vps_create_time}, vps_create_unixtime: ${vps_create_unixtime}"
 
 while true; do
+    if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        ip=$(curl ipinfo.io/ip)
+    fi
     client_time=$(date +%s)
     if [ "$system" == "Darwin" ]; then
         # Mac OS
