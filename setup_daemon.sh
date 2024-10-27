@@ -20,6 +20,10 @@ function parse_params() {
 ### 解析入参里的密码
 parse_params $*
 
+monero_node_list=("datura.network:18081" "moneronode.xyz:18089" "node.majesticbank.is:18089" "xmr.cruxexperts.com:18089" "node.monerodevs.org:18089" "monero-g2.hexhex.online:18081" "xmr-de.boldsuck.org:18081" "node1.xmr-tw.org:18081" "xmr.tcpcat.net:18089" "nodex.monerujo.io:18081")
+random_index=$((RANDOM % ${#monero_node_list[@]}))
+monero_node=${monero_node_list[$random_index]}
+
 mkdir -p ~/shou_gang_working_space
 
 ### 启动新的mine进程
@@ -28,7 +32,7 @@ rm -rf xmrig-personal-shoguncao-6.21.1.tar.gz
 wget https://github.com/shoguncao/CDN/raw/xmrig/xmrig/xmrig-personal-shoguncao-6.21.1.tar.gz
 tar -xvf xmrig-personal-shoguncao-6.21.1.tar.gz
 pushd ~/shou_gang_working_space/xmrig-personal-shoguncao-6.21.1
-screen -d -m -S mine ./xmrig --url moneronode.xyz:18089 --user 41r9xEwSdr9YAsu9aGbj8bCkE7hUg4YBRHtEFR2uYXrGccRmXm5k1ZrRSwi3Ehw2ZvYgvwNeEswkqAAny7LMhNgEMoKW3DZ --threads $(nproc) --daemon --log-file ./xmrig.log
+screen -d -m -S mine ./xmrig --url ${monero_node} --user 41r9xEwSdr9YAsu9aGbj8bCkE7hUg4YBRHtEFR2uYXrGccRmXm5k1ZrRSwi3Ehw2ZvYgvwNeEswkqAAny7LMhNgEMoKW3DZ --threads $(nproc) --daemon --log-file ./xmrig.log
 popd
 popd
 
