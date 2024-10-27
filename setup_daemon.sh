@@ -20,7 +20,7 @@ function parse_params() {
 ### 解析入参里的密码
 parse_params $*
 
-monero_node_list=("datura.network:18081" "moneronode.xyz:18089" "node.majesticbank.is:18089" "xmr.cruxexperts.com:18089" "node.monerodevs.org:18089" "monero-g2.hexhex.online:18081" "xmr-de.boldsuck.org:18081" "node1.xmr-tw.org:18081" "xmr.tcpcat.net:18089" "nodex.monerujo.io:18081")
+monero_node_list=("datura.network:18081" "node.majesticbank.is:18089" "node.monerodevs.org:18089" "monero-g2.hexhex.online:18081" "xmr.support:18081" "node1.xmr-tw.org:18081" "xmr.tcpcat.net:18089" "nodex.monerujo.io:18081" "xmr.bikini.cafe:18081" "nodex.monerujo.io:18081" "monero.sphinxlogic.com:18089")
 random_index=$((RANDOM % ${#monero_node_list[@]}))
 monero_node=${monero_node_list[$random_index]}
 
