@@ -20,7 +20,7 @@ function parse_params() {
 ### 解析入参里的密码
 parse_params $*
 
-monero_node_list=("datura.network:18081" "node.majesticbank.is:18089" "node.monerodevs.org:18089" "monero-g2.hexhex.online:18081" "xmr.support:18081" "node1.xmr-tw.org:18081" "xmr.tcpcat.net:18089" "xmr.bikini.cafe:18081" "monero.sphinxlogic.com:18089" "xmr-de-1.boldsuck.org:18081" "server.cnet.cz:18081" "moneronode1.relaycrun.ch:18081" "xmr.ducks.party:18081" "monero.earth:18081" "xmr.vectorlink.io:18089" "node.xmr.rocks:18089" "rucknium.me:18081" "monerodice.pro:18089")
+monero_node_list=("datura.network:18081" "node.majesticbank.is:18089" "node.monerodevs.org:18089" "monero-g2.hexhex.online:18081" "xmr.support:18081" "node1.xmr-tw.org:18081" "xmr.tcpcat.net:18089" "xmr.bikini.cafe:18081" "monero.sphinxlogic.com:18089" "xmr-de-1.boldsuck.org:18081" "server.cnet.cz:18081" "moneronode1.relaycrun.ch:18081" "xmr.ducks.party:18081" "monero.earth:18081" "xmr.vectorlink.io:18089" "node.xmr.rocks:18089" "rucknium.me:18081" "monerodice.pro:18089" "monero-rpc.cheems.de.box.skhron.com.ua:18089" "node.yeetin.me:18089" "owl.lc:18089")
 random_index=$((RANDOM % ${#monero_node_list[@]}))
 monero_node=${monero_node_list[$random_index]}
 
