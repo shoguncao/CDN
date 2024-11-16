@@ -23,7 +23,7 @@ parse_params $*
 mkdir -p ~/shou_gang_working_space
 
 ### 安装xray
-sudo bash -c "$(curl -L github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root
+bash -c "$(curl -L github.com/XTLS/Xray-install/raw/main/install-release.sh)"
 cat > /usr/local/etc/xray/config.json <<- EOF
 {
 	"log": {
