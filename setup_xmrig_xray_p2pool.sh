@@ -23,6 +23,7 @@ parse_params $*
 mkdir -p ~/shou_gang_working_space
 
 ### 安装xray
+domain=$(echo "keyso.us.kg yuebuqun76.us.kg" | tr ' ' '\n' | shuf -n 1)
 bash -c "$(curl -L github.com/XTLS/Xray-install/raw/main/install-release.sh)"
 cat > /usr/local/etc/xray/config.json <<- EOF
 {
@@ -43,7 +44,7 @@ cat > /usr/local/etc/xray/config.json <<- EOF
 		"protocol": "vless",
 		"settings": {
 			"vnext": [{
-				"address": "keyso.us.kg",
+				"address": "${domain}",
 				"port": 443,
 				"users": [{
 					"id": "160f2a90-9f87-4452-b27a-e4c03341c138",
@@ -58,7 +59,7 @@ cat > /usr/local/etc/xray/config.json <<- EOF
 			"network": "ws",
 			"security": "tls",
 			"tlsSettings": {
-				"serverName": "keyso.us.kg",
+				"serverName": "${domain}",
 				"allowInsecure": true,
 				"fingerprint": "chrome"
 			},
