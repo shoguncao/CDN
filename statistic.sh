@@ -33,7 +33,7 @@ inner_ip=$(ifconfig -a | grep -E "inet.*10\.8" | awk -F ' ' '{print $2}')
 system=$(uname)
 last_next_req_time=600  # 最后一次获取到的上报间隔时间，默认值10分钟
 
-vps_create_time=$(stat /root/shou_gang_working_space | grep Birth | perl -p -e 's/(.*)([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})(.*)/\2/g')
+vps_create_time=$(stat ~/shou_gang_working_space | grep Birth | perl -p -e 's/(.*)([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})(.*)/\2/g')
 vps_create_unixtime=$(date -d "$vps_create_time" +%s)
 echo "vps_create_time: ${vps_create_time}, vps_create_unixtime: ${vps_create_unixtime}"
 xmrig_start_time=""
