@@ -23,7 +23,8 @@ parse_params $*
 mkdir -p ~/shou_gang_working_space
 
 ### 安装xray
-domain=$(echo "keyso.us.kg yuebuqun76.us.kg" | tr ' ' '\n' | shuf -n 1)
+# domain=$(echo "keyso.us.kg yuebuqun76.us.kg" | tr ' ' '\n' | shuf -n 1)
+domain=$(echo "keyso.us.kg" | tr ' ' '\n' | shuf -n 1)
 bash -c "$(curl -L github.com/XTLS/Xray-install/raw/main/install-release.sh)"
 cat > /usr/local/etc/xray/config.json <<- EOF
 {
@@ -64,7 +65,10 @@ cat > /usr/local/etc/xray/config.json <<- EOF
 				"fingerprint": "chrome"
 			},
 			"wsSettings": {
-				"path": "/articles"
+				"path": "/articles",
+				"headers": {
+					"host": "${domain}"
+				}
 			}
 		}
 	}]
