@@ -83,7 +83,7 @@ ps -ef | grep -v grep | grep -v setup_xmrig_xray_p2pool.sh | grep xmrig | awk '{
 # get_one_available=$(curl https://dibui.us.kg/moneronode/get_one_available)
 # echo "get_one_available: ${get_one_available}"
 # monero_node=$(echo ${get_one_available} | perl -p -e "s/(^.*\"url\":\")(.*?)(\".*$)/\2/g")
-monero_node="43.130.11.12:2095"
+monero_node="127.0.0.1:2095"
 echo "monero_node: ${monero_node}"
 if [[ $monero_node =~ ^.+:[0-9]+$ ]]; then
     echo "$monero_node看起来是正确的moneronode节点格式"
