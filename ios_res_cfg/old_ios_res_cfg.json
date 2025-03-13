@@ -1,0 +1,18 @@
+{
+	"url": "https://mirrors.tencent.com/repository/generic/Box_iOS_Libs/test/HDiffPatch/old.zip",
+	"hash": "aa077f3d30c21517113f3fa962cd422f28a5e261305752caa62fe417a7429691",
+	"url2x": "https://mirrors.tencent.com/repository/generic/Box_iOS_Libs/test/HDiffPatch/old2x.zip",
+	"hash2x": "dd33e3c876a054e81727070bb1c5ebaf050472b985f97c87b16884cf786899a0",
+	"url3x": "https://mirrors.tencent.com/repository/generic/Box_iOS_Libs/test/HDiffPatch/old3x.zip",
+	"hash3x": "be55b32ca94de79d98e8d4f55a3b434b399e4d02e60c0dbb0c2e4c4111395c64",
+	"ver": "1741835988",
+	"urlPatch": "",
+	"hashPatch": "",
+	"url2xPatch": "",
+	"hash2xPatch": "",
+	"url3xPatch": "",
+	"hash3xPatch": "",
+	"verPatch": "",
+	"lang": "zh-Hans",
+	"autoDownload": 0
+}
