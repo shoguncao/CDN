@@ -1,5 +1,5 @@
-// Main.js 1.0.9 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.0.9';
+// Main.js 1.1.0 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.1.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -42,6 +42,21 @@ try {
     let m = 3;                                                     // 网页比容器小 3px，红边露出来
     slot.SetSize(new UE.Vector2D(s.X - m, s.Y - m));
     slot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
+
+    // 右上角关闭按钮
+    // 必须放在网页区域之外：iOS 的 WebView 是原生 UIView，盖在所有 UE 内容之上，
+    // 落在它范围内的 UMG 按钮会被盖住且点不到
+    let bs = 64;
+    let btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
+    let txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
+    txt.SetText('X');
+    btn.AddChild(txt);
+    let btnSlot = canvas.AddChild(btn);
+    btnSlot.SetZOrder(2);
+    btnSlot.SetSize(new UE.Vector2D(bs, bs));
+    btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - bs, p.Y - bs));   // 右下角贴住容器右上角
+    btn.OnClicked.Add(function () { w.RemoveFromViewport(); });
+
     canvas.ForceLayoutPrepass();                                   // 立即重算布局
 
     log('网页已加载');
