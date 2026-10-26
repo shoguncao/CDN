@@ -1,5 +1,5 @@
-// Main.js 1.0.6 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.0.6';
+// Main.js 1.0.7 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.0.7';
 
 let world = puerts.argv.getByName('World');
 
@@ -21,8 +21,9 @@ try {
     let canvas = w.WidgetTree.RootWidget;
     // 不能用 tree.ConstructWidget（不是 UFUNCTION，反射调不到），用 UE.NewObject
     // 半透明底板：用来看清容器实际占的位置和大小（确认无误后删掉这两行）
-    let bg = UE.NewObject(UE.Border.StaticClass(), w.WidgetTree);
-    bg.SetBrushColor(new UE.LinearColor(1, 0, 0, 0.35));
+    // 注意不能用 Border：它默认的 Background brush 是空的（DrawAs=NoDrawingType），什么都不画
+    let bg = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
+    bg.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 0.35));
     let bgSlot = canvas.AddChild(bg);
 
     let browser = UE.NewObject(UE.WebBrowser.StaticClass(), w.WidgetTree);
