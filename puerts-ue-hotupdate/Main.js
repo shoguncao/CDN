@@ -1,5 +1,5 @@
-// Main.js 1.2.0 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.2.0';
+// Main.js 1.3.0 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.3.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -35,19 +35,20 @@ try {
     // 而 iOS 打包 UseNodejs=false，setTimeout 根本不会触发）
     let vp = UE.WidgetLayoutLibrary.GetViewportSize(world);
     log('viewport=' + vp.X + 'x' + vp.Y);
-    let s = new UE.Vector2D(vp.X * 0.618, vp.Y * 0.618);
-    let p = new UE.Vector2D((vp.X - s.X) / 2, (vp.Y - s.Y) / 2);   // 居中
-    bgSlot.SetSize(s);                                             // 容器（UMG 绘制，位置正确）
+
+    // 注意：GetViewportSize 返回的是渲染 buffer 尺寸，而 UMG 布局坐标系 = buffer / DPIScale
+    // （本机实测 1704 的 buffer 对应约 2340 的布局系，即 DPIScale≈0.728，需反向放大）。
+    // 容器/网页/按钮必须统一用换算后的坐标，否则互相错位
+    const DS = 1.374;
+    let vx = vp.X * DS;
+    let vy = vp.Y * DS;
+    let s = new UE.Vector2D(vx * 0.618, vy * 0.618);
+    let p = new UE.Vector2D((vx - s.X) / 2, (vy - s.Y) / 2);       // 居中
+    bgSlot.SetSize(s);                                             // 容器
     bgSlot.SetPosition(p);
     let m = 3;                                                     // 网页比容器小 3px，红边露出来
-
-    // 网页要补偿：iOS 上原生 WebView 的 frame 会被 IOSView.contentScaleFactor 缩小
-    // （IOSPlatformWebBrowser.cpp:116-118 除以 CSF），而 UE 渲染 buffer 由
-    // r.MobileContentScaleFactor 决定，两者不匹配 -> 位置和尺寸整体 x0.728（本机实测）。
-    // 治本：r.MobileContentScaleFactor=0（原生分辨率，与 nativeScale 一致），届时 COMP 改回 1
-    const COMP = 1.374;
-    slot.SetSize(new UE.Vector2D((s.X - m) * COMP, (s.Y - m) * COMP));
-    slot.SetPosition(new UE.Vector2D((p.X + m / 2) * COMP, (p.Y + m / 2) * COMP));
+    slot.SetSize(new UE.Vector2D(s.X - m, s.Y - m));
+    slot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
 
     // 右上角关闭按钮
     // 必须放在网页区域之外：iOS 的 WebView 是原生 UIView，盖在所有 UE 内容之上，
