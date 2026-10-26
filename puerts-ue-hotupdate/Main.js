@@ -1,5 +1,5 @@
-// Main.js 1.1.0 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.1.0';
+// Main.js 1.2.0 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.2.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -37,20 +37,27 @@ try {
     log('viewport=' + vp.X + 'x' + vp.Y);
     let s = new UE.Vector2D(vp.X * 0.618, vp.Y * 0.618);
     let p = new UE.Vector2D((vp.X - s.X) / 2, (vp.Y - s.Y) / 2);   // 居中
-    bgSlot.SetSize(s);                                             // 容器
+    bgSlot.SetSize(s);                                             // 容器（UMG 绘制，位置正确）
     bgSlot.SetPosition(p);
     let m = 3;                                                     // 网页比容器小 3px，红边露出来
-    slot.SetSize(new UE.Vector2D(s.X - m, s.Y - m));
-    slot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
+
+    // 网页要补偿：iOS 上原生 WebView 的 frame 会被 IOSView.contentScaleFactor 缩小
+    // （IOSPlatformWebBrowser.cpp:116-118 除以 CSF），而 UE 渲染 buffer 由
+    // r.MobileContentScaleFactor 决定，两者不匹配 -> 位置和尺寸整体 x0.728（本机实测）。
+    // 治本：r.MobileContentScaleFactor=0（原生分辨率，与 nativeScale 一致），届时 COMP 改回 1
+    const COMP = 1.374;
+    slot.SetSize(new UE.Vector2D((s.X - m) * COMP, (s.Y - m) * COMP));
+    slot.SetPosition(new UE.Vector2D((p.X + m / 2) * COMP, (p.Y + m / 2) * COMP));
 
     // 右上角关闭按钮
     // 必须放在网页区域之外：iOS 的 WebView 是原生 UIView，盖在所有 UE 内容之上，
     // 落在它范围内的 UMG 按钮会被盖住且点不到
     let bs = 64;
     let btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
-    let txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
-    txt.SetText('X');
-    btn.AddChild(txt);
+    // 按钮内容用 Image：UButton 运行时 new 的默认 Style 是空 brush（不画），TextBlock 又没字体，都不可见
+    let icon = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
+    icon.SetColorAndOpacity(new UE.LinearColor(1, 1, 1, 0.9));
+    btn.AddChild(icon);
     let btnSlot = canvas.AddChild(btn);
     btnSlot.SetZOrder(2);
     btnSlot.SetSize(new UE.Vector2D(bs, bs));
