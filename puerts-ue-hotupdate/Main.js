@@ -1,5 +1,5 @@
-// Main.js 1.0.7 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.0.7';
+// Main.js 1.0.9 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.0.9';
 
 let world = puerts.argv.getByName('World');
 
@@ -20,11 +20,12 @@ try {
     w.AddToViewport(0);                          // 必须：UMG 在这一步才建好控件树
     let canvas = w.WidgetTree.RootWidget;
     // 不能用 tree.ConstructWidget（不是 UFUNCTION，反射调不到），用 UE.NewObject
-    // 半透明底板：用来看清容器实际占的位置和大小（确认无误后删掉这两行）
+    // 半透明底板：用来看清容器实际占的位置和大小（确认无误后删掉这几行）
     // 注意不能用 Border：它默认的 Background brush 是空的（DrawAs=NoDrawingType），什么都不画
     let bg = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
     bg.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 0.35));
     let bgSlot = canvas.AddChild(bg);
+    bgSlot.SetZOrder(1);      // 提到网页上层：iOS 的 WebView 是原生视图盖在最上面，不提层级会被它完全挡住
 
     let browser = UE.NewObject(UE.WebBrowser.StaticClass(), w.WidgetTree);
     let slot = canvas.AddChild(browser);
@@ -33,10 +34,15 @@ try {
     // 同步设置尺寸（不能用 setTimeout：puerts 的定时器线程只在 WITH_NODEJS 时创建，
     // 而 iOS 打包 UseNodejs=false，setTimeout 根本不会触发）
     let vp = UE.WidgetLayoutLibrary.GetViewportSize(world);
+    log('viewport=' + vp.X + 'x' + vp.Y);
     let s = new UE.Vector2D(vp.X * 0.618, vp.Y * 0.618);
     let p = new UE.Vector2D((vp.X - s.X) / 2, (vp.Y - s.Y) / 2);   // 居中
-    [bgSlot, slot].forEach(function (sl) { sl.SetSize(s); sl.SetPosition(p); });
-    canvas.ForceLayoutPrepass();                                 // 立即重算布局
+    bgSlot.SetSize(s);                                             // 容器
+    bgSlot.SetPosition(p);
+    let m = 3;                                                     // 网页比容器小 3px，红边露出来
+    slot.SetSize(new UE.Vector2D(s.X - m, s.Y - m));
+    slot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
+    canvas.ForceLayoutPrepass();                                   // 立即重算布局
 
     log('网页已加载');
 } catch (e) {
