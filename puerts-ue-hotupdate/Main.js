@@ -1,5 +1,5 @@
-// Main.js 1.0.3 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.0.3';
+// Main.js 1.0.4 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.0.4';
 
 let world = puerts.argv.getByName('World');
 
@@ -21,8 +21,18 @@ try {
     let canvas = w.WidgetTree.RootWidget;
     // 不能用 tree.ConstructWidget（不是 UFUNCTION，反射调不到），用 UE.NewObject
     let browser = UE.NewObject(UE.WebBrowser.StaticClass(), w.WidgetTree);
-    canvas.AddChild(browser).SetSize(UE.WidgetLayoutLibrary.GetViewportSize(world));
+    let slot = canvas.AddChild(browser);
     browser.LoadURL('https://www.qq.com');
+
+    // 尺寸晚一帧再设：iOS 的原生 WebView 在控件刚加进来时按初始几何创建，
+    // 立刻 SetSize 它跟不上（画面只占一小块），等布局完再设就会跟着变
+    let vp = UE.WidgetLayoutLibrary.GetViewportSize(world);
+    setTimeout(function () {
+        let s = new UE.Vector2D(vp.X * 0.618, vp.Y * 0.618);
+        slot.SetSize(s);
+        slot.SetPosition(new UE.Vector2D((vp.X - s.X) / 2, (vp.Y - s.Y) / 2));   // 居中
+    }, 100);
+
     log('网页已加载');
 } catch (e) {
     log('错误: ' + e);
