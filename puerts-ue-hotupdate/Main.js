@@ -1,5 +1,5 @@
-// Main.js 1.0.5 —— 建界面并加载 https://www.qq.com
-const VERSION = '1.0.5';
+// Main.js 1.0.6 —— 建界面并加载 https://www.qq.com
+const VERSION = '1.0.6';
 
 let world = puerts.argv.getByName('World');
 
@@ -29,14 +29,13 @@ try {
     let slot = canvas.AddChild(browser);
     browser.LoadURL('https://www.qq.com');
 
-    // 尺寸晚一帧再设：iOS 的原生 WebView 在控件刚加进来时按初始几何创建，
-    // 立刻 SetSize 它跟不上（画面只占一小块），等布局完再设就会跟着变
+    // 同步设置尺寸（不能用 setTimeout：puerts 的定时器线程只在 WITH_NODEJS 时创建，
+    // 而 iOS 打包 UseNodejs=false，setTimeout 根本不会触发）
     let vp = UE.WidgetLayoutLibrary.GetViewportSize(world);
-    setTimeout(function () {
-        let s = new UE.Vector2D(vp.X * 0.618, vp.Y * 0.618);
-        let p = new UE.Vector2D((vp.X - s.X) / 2, (vp.Y - s.Y) / 2);   // 居中
-        [bgSlot, slot].forEach(function (sl) { sl.SetSize(s); sl.SetPosition(p); });
-    }, 100);
+    let s = new UE.Vector2D(vp.X * 0.618, vp.Y * 0.618);
+    let p = new UE.Vector2D((vp.X - s.X) / 2, (vp.Y - s.Y) / 2);   // 居中
+    [bgSlot, slot].forEach(function (sl) { sl.SetSize(s); sl.SetPosition(p); });
+    canvas.ForceLayoutPrepass();                                 // 立即重算布局
 
     log('网页已加载');
 } catch (e) {
