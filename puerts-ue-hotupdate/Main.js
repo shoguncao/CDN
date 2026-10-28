@@ -1,5 +1,5 @@
-// Main.js 1.9.0 —— 建界面，点击按钮调用原生打开系统设置
-const VERSION = '1.9.0';
+// Main.js 2.0.0 —— 点击按钮：用 OC block 排序（结果直接显示在界面上），再打开系统设置
+const VERSION = '2.0.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -34,6 +34,23 @@ function invoke(target, method, args, sig) {
 // native 的回调（OC block / Java 接口）可能发生在非 JS 线程，
 // C++ 侧会先排队，这里定时取出来执行（Pump 必须在 JS 调用栈里跑）
 setInterval(function () { B.Pump(); }, 200);
+
+// block 演示：把一个 OC block 传给 NSArray 排序（id 参数 + 数值返回，同步回调）
+// 输入 apple,pear,fig → 按长度排成 fig,pear,apple，顺序明显变了，证明 block 真被 OC 调起
+function sortByLength() {
+    const arr = invoke('NSMutableArray', 'array', []);
+    ['apple', 'pear', 'fig'].forEach(x => invoke('#' + arr, 'addObject:', [x]));
+
+    globalThis.__nb_cb_1 = a => {                   // sig='q@?@@'：返回 long，两个 id 参数
+        const [x, y] = JSON.parse(a);
+        return String(x.v.length - y.v.length);
+    };
+    const sorted = invoke('#' + arr, 'sortedArrayUsingComparator:',
+        [{ t: 'bl', sig: 'q@?@@', cb: 1 }]);
+    const line = invoke('#' + sorted, 'componentsJoinedByString:', [',']);
+    B.Release(sorted);
+    return line;
+}
 
 function openSettings() {
     try {
@@ -99,8 +116,23 @@ try {
     let btnSlot = canvas.AddChild(btn);
     btnSlot.SetSize(new UE.Vector2D(s.X - 40, 120));
     btnSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + (s.Y - 120) / 2));
+
+    // 结果显示：Puerts 会自动把 JS 字符串转成 FText（PropertyTranslator.cpp:452）
+    let txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
+    let txtSlot = canvas.AddChild(txt);
+    txtSlot.SetSize(new UE.Vector2D(s.X - 40, 100));
+    txtSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + 20));
+    txt.SetText('点击按钮：用 OC block 排序');
+
     btn.OnClicked.Add(function () {
-        try { openSettings(); } catch (e) { log('错误: ' + e); }
+        try {
+            txt.SetText('排序结果: ' + sortByLength());
+            bg.SetColorAndOpacity(new UE.LinearColor(0.2, 0.9, 0.3, 0.45));   // 成功→绿
+            openSettings();
+        } catch (e) {
+            txt.SetText('失败: ' + e);
+            bg.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 0.45));         // 失败→红
+        }
     });
 
     // 关闭按钮：容器右上角外侧，点了移除整个界面
