@@ -1,5 +1,5 @@
-// Main.js 1.6.0 —— 建界面，点击按钮调用原生打开系统设置
-const VERSION = '1.6.0';
+// Main.js 1.7.0 —— 建界面，点击按钮调用原生打开系统设置
+const VERSION = '1.7.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -33,25 +33,21 @@ function invoke(target, method, args, sig) {
 
 function openSettings() {
     try {
-        // iOS：NSURL("app-settings:") → UIApplication.sharedApplication openURL:
-        const url = invoke('NSURL', 'URLWithString:', ['app-settings:']);
-        const app = invoke('UIApplication', 'sharedApplication', []);
-        log('url句柄=' + url + ' app句柄=' + app);
+        // iOS 10+：openURL:options:completionHandler:
+        // 老的 openURL: 在这个系统上会被拒绝（返回 NO），只能用它
+        const url  = invoke('NSURL', 'URLWithString:', ['app-settings:']);
+        const app  = invoke('UIApplication', 'sharedApplication', []);
+        const opts = invoke('NSDictionary', 'dictionary', []);   // options 传空字典即可
 
-        // openURL: 返回 BOOL，表示系统是否接受，必须检查
-        const ok = invoke('#' + app, 'openURL:', [h(url)]);
-        log('openURL:(app-settings:) 返回 ' + ok);
-        if (ok) {
-            return;
-        }
-
-        // 老 API 被拒时改走新 API（iOS 10+）：openURL:options:completionHandler:
-        const opts = invoke('NSDictionary', 'dictionary', []);
+        // completionHandler 是我们运行时构造的 OC block，异步告诉我们结果
         const cbId = 99;
-        globalThis['__nb_cb_' + cbId] = function (a) { log('openURL 回调参数: ' + a); return ''; };
+        globalThis['__nb_cb_' + cbId] = function (a) {
+            log('openURL 回调: ' + a);                  // [1]=成功打开，[0]=失败
+            return '';
+        };
         invoke('#' + app, 'openURL:options:completionHandler:',
             [h(url), h(opts), { t: 'bl', sig: 'v@?B', cb: cbId }]);
-        log('已尝试新 API');
+        log('已请求打开系统设置');
         return;
     } catch (e) {
         log('iOS 路径失败: ' + e);
