@@ -1,5 +1,5 @@
-// Main.js 1.5.0 —— 建界面，点击按钮调用原生打开系统设置
-const VERSION = '1.5.0';
+// Main.js 1.6.0 —— 建界面，点击按钮调用原生打开系统设置
+const VERSION = '1.6.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -36,16 +36,34 @@ function openSettings() {
         // iOS：NSURL("app-settings:") → UIApplication.sharedApplication openURL:
         const url = invoke('NSURL', 'URLWithString:', ['app-settings:']);
         const app = invoke('UIApplication', 'sharedApplication', []);
-        invoke('#' + app, 'openURL:', [h(url)]);
-        log('已打开系统设置');
+        log('url句柄=' + url + ' app句柄=' + app);
+
+        // openURL: 返回 BOOL，表示系统是否接受，必须检查
+        const ok = invoke('#' + app, 'openURL:', [h(url)]);
+        log('openURL:(app-settings:) 返回 ' + ok);
+        if (ok) {
+            return;
+        }
+
+        // 老 API 被拒时改走新 API（iOS 10+）：openURL:options:completionHandler:
+        const opts = invoke('NSDictionary', 'dictionary', []);
+        const cbId = 99;
+        globalThis['__nb_cb_' + cbId] = function (a) { log('openURL 回调参数: ' + a); return ''; };
+        invoke('#' + app, 'openURL:options:completionHandler:',
+            [h(url), h(opts), { t: 'bl', sig: 'v@?B', cb: cbId }]);
+        log('已尝试新 API');
         return;
     } catch (e) {
         log('iOS 路径失败: ' + e);
     }
     // Android：new Intent("android.settings.SETTINGS") → Activity.startActivity
-    const intent = invoke('android.content.Intent', '<init>', ['android.settings.SETTINGS'], '(Ljava/lang/String;)V');
-    invoke('@activity', 'startActivity', [h(intent)], '(Landroid/content/Intent;)V');
-    log('已打开系统设置');
+    try {
+        const intent = invoke('android.content.Intent', '<init>', ['android.settings.SETTINGS'], '(Ljava/lang/String;)V');
+        invoke('@activity', 'startActivity', [h(intent)], '(Landroid/content/Intent;)V');
+        log('已打开系统设置(Android)');
+    } catch (e) {
+        log('Android 路径失败: ' + e);
+    }
 }
 
 try {
