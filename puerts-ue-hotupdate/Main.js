@@ -1,5 +1,5 @@
-// Main.js 1.7.0 —— 建界面，点击按钮调用原生打开系统设置
-const VERSION = '1.7.0';
+// Main.js 1.8.0 —— 建界面，点击按钮调用原生打开系统设置
+const VERSION = '1.8.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -30,6 +30,10 @@ function invoke(target, method, args, sig) {
     if (r.t === 'e') throw new Error(r.v);
     return r.v;                                     // 对象返回值就是句柄 number
 }
+
+// native 的回调（OC block / Java 接口）可能发生在非 JS 线程，
+// C++ 侧会先排队，这里定时取出来执行（Pump 必须在 JS 调用栈里跑）
+setInterval(function () { B.Pump(); }, 200);
 
 function openSettings() {
     try {
