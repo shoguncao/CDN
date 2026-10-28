@@ -1,5 +1,5 @@
-// Main.js 1.8.0 —— 建界面，点击按钮调用原生打开系统设置
-const VERSION = '1.8.0';
+// Main.js 1.9.0 —— 建界面，点击按钮调用原生打开系统设置
+const VERSION = '1.9.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -44,9 +44,11 @@ function openSettings() {
         const opts = invoke('NSDictionary', 'dictionary', []);   // options 传空字典即可
 
         // completionHandler 是我们运行时构造的 OC block，异步告诉我们结果
+        // 回调参数是"带类型"的数组：[{"t":"b","v":true}] 之类
         const cbId = 99;
         globalThis['__nb_cb_' + cbId] = function (a) {
-            log('openURL 回调: ' + a);                  // [1]=成功打开，[0]=失败
+            const args = JSON.parse(a);
+            log('openURL 结果: ' + (args[0] ? args[0].v : a));   // true=成功打开
             return '';
         };
         invoke('#' + app, 'openURL:options:completionHandler:',
