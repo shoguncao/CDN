@@ -1,5 +1,5 @@
-// Main.js 2.5.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到界面上
-const VERSION = '2.5.0';
+// Main.js 2.6.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到界面上
+const VERSION = '2.6.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -37,11 +37,14 @@ function invoke(target, method, args) {
 // 必须加到 window.rootViewController.view。
 function addRedView() {
     const view = invoke('#' + invoke('UIView', 'alloc', []), 'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);
+    log('1 视图=' + view);
     invoke('#' + view, 'setBackgroundColor:', [h(invoke('UIColor', 'redColor', []))]);
+    log('2 底色已设');
 
     const app = invoke('UIApplication', 'sharedApplication', []);
     const del = invoke('#' + app, 'delegate', []);
     const win = del ? invoke('#' + del, 'window', []) : invoke('#' + app, 'keyWindow', []);
+    log('3 app=' + app + ' del=' + del + ' win=' + win);
 
     let rvc = invoke('#' + win, 'rootViewController', []);
     if (!rvc) {                                   // 没有根控制器就现造一个
@@ -49,8 +52,10 @@ function addRedView() {
         invoke('#' + win, 'setRootViewController:', [h(rvc)]);
     }
     const root = invoke('#' + rvc, 'view', []);
+    log('4 rvc=' + rvc + ' root=' + root);
+
     invoke('#' + root, 'addSubview:', [h(view)]);
-    log('已添加红色 UIView 句柄=' + view + '，父视图=' + root);
+    log('5 addSubview 完成');
 }
 
 try {
@@ -83,8 +88,15 @@ try {
     const btnSlot = canvas.AddChild(btn);
     btnSlot.SetSize(new UE.Vector2D(s.X - 40, 120));
     btnSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + (s.Y - 120) / 2));
+    // 成功/失败用容器颜色反馈，来不及看日志也能判断
     btn.OnClicked.Add(function () {
-        try { addRedView(); } catch (e) { log('错误: ' + e); }
+        try {
+            addRedView();
+            bg.SetColorAndOpacity(new UE.LinearColor(0.2, 0.9, 0.3, 0.45));   // 绿=成功
+        } catch (e) {
+            log('错误: ' + e);
+            bg.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 0.8));           // 红=失败
+        }
     });
 
     // 关闭按钮：容器右上角外侧
