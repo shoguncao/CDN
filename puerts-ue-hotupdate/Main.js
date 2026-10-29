@@ -1,5 +1,5 @@
-// Main.js 2.0.0 —— 点击按钮：用 OC block 排序（结果直接显示在界面上），再打开系统设置
-const VERSION = '2.0.0';
+// Main.js 2.0.1 —— 点击按钮：用 OC block 排序（结果直接显示在界面上），再打开系统设置
+const VERSION = '2.0.1';
 
 let world = puerts.argv.getByName('World');
 
@@ -24,6 +24,10 @@ function arg(v) {                                   // JS 值 → {t, v}
 }
 
 function h(id) { return { t: 'h', v: id }; }        // 传对象句柄
+
+// Puerts 默认定义了 PUERTS_FTEXT_AS_OBJECT（JsEnv.Build.cs:87），
+// 即 FText 是"对象模式"：SetText 直接传 JS 字符串会被当指针解析而崩溃，必须先转换
+function T(s) { return UE.KismetTextLibrary.Conv_StringToText(s); }
 
 function invoke(target, method, args, sig) {
     const r = JSON.parse(B.Invoke(String(target), method, JSON.stringify((args || []).map(arg)), sig || ''));
@@ -122,15 +126,15 @@ try {
     let txtSlot = canvas.AddChild(txt);
     txtSlot.SetSize(new UE.Vector2D(s.X - 40, 100));
     txtSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + 20));
-    txt.SetText('点击按钮：用 OC block 排序');
+    txt.SetText(T('点击按钮：用 OC block 排序'));
 
     btn.OnClicked.Add(function () {
         try {
-            txt.SetText('排序结果: ' + sortByLength());
+            txt.SetText(T('排序结果: ' + sortByLength()));
             bg.SetColorAndOpacity(new UE.LinearColor(0.2, 0.9, 0.3, 0.45));   // 成功→绿
             openSettings();
         } catch (e) {
-            txt.SetText('失败: ' + e);
+            txt.SetText(T('失败: ' + e));
             bg.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 0.45));         // 失败→红
         }
     });
