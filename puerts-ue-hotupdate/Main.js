@@ -1,5 +1,6 @@
-// Main.js 2.6.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到界面上
-const VERSION = '2.6.0';
+// Main.js 2.7.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到界面上
+// 判读方式：容器变绿=成功（左侧出现红方块）；容器变黄=失败（红=成功目标，故失败不用红色）
+const VERSION = '2.7.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -88,14 +89,15 @@ try {
     const btnSlot = canvas.AddChild(btn);
     btnSlot.SetSize(new UE.Vector2D(s.X - 40, 120));
     btnSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + (s.Y - 120) / 2));
-    // 成功/失败用容器颜色反馈，来不及看日志也能判断
+    // 成功/失败用容器颜色反馈，来不及看日志也能判断。
+    // 注意：失败色不能是红色 —— 成功的目标本身就是一个红色方块，会混淆
     btn.OnClicked.Add(function () {
         try {
             addRedView();
             bg.SetColorAndOpacity(new UE.LinearColor(0.2, 0.9, 0.3, 0.45));   // 绿=成功
         } catch (e) {
             log('错误: ' + e);
-            bg.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 0.8));           // 红=失败
+            bg.SetColorAndOpacity(new UE.LinearColor(1, 0.9, 0.1, 0.6));       // 黄=失败
         }
     });
 
