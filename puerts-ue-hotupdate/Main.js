@@ -1,5 +1,5 @@
-// Main.js 2.4.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到主 window 上
-const VERSION = '2.4.0';
+// Main.js 2.5.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到界面上
+const VERSION = '2.5.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -31,24 +31,26 @@ function invoke(target, method, args) {
     return r.v;                                     // 对象返回值就是句柄 number
 }
 
-// 点击：[[UIView alloc] initWithFrame:CGRectMake(...)] → 红色 → 加到 App 自己的 window
-// 取窗口的讲究：keyWindow 有时是系统窗口（UITextEffectsWindow 之类），
-// 往系统窗口加子视图会触发 UIKit 内部断言（_didMoveFromWindow:toWindow:）直接 abort。
-// 所以优先用 delegate.window（App 自己的窗口），拿不到再回退 keyWindow。
+// 点击：造一个红色 UIView(100x200)，加到根控制器的 view 上
+// 注意：不能往 UIWindow 直接 addSubview（iOS 16+ 会触发 UIKit 内部断言
+// -[UIView(Internal) _didMoveFromWindow:toWindow:] 直接 abort，崩溃报告已确认），
+// 必须加到 window.rootViewController.view。
 function addRedView() {
     const view = invoke('#' + invoke('UIView', 'alloc', []), 'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);
     invoke('#' + view, 'setBackgroundColor:', [h(invoke('UIColor', 'redColor', []))]);
-    log('已建红色视图 句柄=' + view + ' 主线程=' + invoke('NSThread', 'isMainThread', []));
 
     const app = invoke('UIApplication', 'sharedApplication', []);
     const del = invoke('#' + app, 'delegate', []);
-    let win = del ? invoke('#' + del, 'window', []) : null;
-    log('delegate.window=' + win + (win ? '' : ' → 回退 keyWindow'));
-    if (!win) { win = invoke('#' + app, 'keyWindow', []); }
-    log('window 描述=' + invoke('#' + win, 'description', []));
+    const win = del ? invoke('#' + del, 'window', []) : invoke('#' + app, 'keyWindow', []);
 
-    invoke('#' + win, 'addSubview:', [h(view)]);
-    log('addSubview 完成，句柄=' + view);
+    let rvc = invoke('#' + win, 'rootViewController', []);
+    if (!rvc) {                                   // 没有根控制器就现造一个
+        rvc = invoke('#' + invoke('UIViewController', 'alloc', []), 'init', []);
+        invoke('#' + win, 'setRootViewController:', [h(rvc)]);
+    }
+    const root = invoke('#' + rvc, 'view', []);
+    invoke('#' + root, 'addSubview:', [h(view)]);
+    log('已添加红色 UIView 句柄=' + view + '，父视图=' + root);
 }
 
 try {
