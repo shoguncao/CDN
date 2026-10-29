@@ -1,5 +1,5 @@
-// Main.js 2.0.1 —— 点击按钮：用 OC block 排序（结果直接显示在界面上），再打开系统设置
-const VERSION = '2.0.1';
+// Main.js 2.1.0 —— 点击按钮：用 OC block 处理 id（收到 id / 用 id 调用 / 返回 id），结果直接显示在界面
+const VERSION = '2.1.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -39,21 +39,35 @@ function invoke(target, method, args, sig) {
 // C++ 侧会先排队，这里定时取出来执行（Pump 必须在 JS 调用栈里跑）
 setInterval(function () { B.Pump(); }, 200);
 
-// block 演示：把一个 OC block 传给 NSArray 排序（id 参数 + 数值返回，同步回调）
-// 输入 apple,pear,fig → 按长度排成 fig,pear,apple，顺序明显变了，证明 block 真被 OC 调起
-function sortByLength() {
+// block 演示：参数是 id、返回值也是 id（同步回调，结果直接可见）
+// ① NSNumber 不是 NSString → 回调拿到的是句柄 {"t":"h"}，JS 拿它继续调方法
+// ② block 返回 {"h":句柄}，OC 采纳后能取回那个对象
+function blockIdDemo() {
     const arr = invoke('NSMutableArray', 'array', []);
-    ['apple', 'pear', 'fig'].forEach(x => invoke('#' + arr, 'addObject:', [x]));
+    [3.5, 1.25, 2.5].forEach(x => invoke('#' + arr, 'addObject:', [h(invoke('NSNumber', 'numberWithDouble:', [x]))]));
 
-    globalThis.__nb_cb_1 = a => {                   // sig='q@?@@'：返回 long，两个 id 参数
-        const [x, y] = JSON.parse(a);
-        return String(x.v.length - y.v.length);
+    globalThis.__nb_cb_1 = a => {                   // sig='q@?@@'：两个 id 参数，返回 long
+        const p = JSON.parse(a);
+        const x = invoke('#' + p[0].v, 'doubleValue', []);     // 用收到的 id 继续调用
+        const y = invoke('#' + p[1].v, 'doubleValue', []);
+        log('block 收到 id: ' + p[0].v + '=' + x + ' / ' + p[1].v + '=' + y);
+        B.Release(p[0].v); B.Release(p[1].v);                   // 用完释放（通道 retain 过）
+        return String(Math.sign(x - y));
     };
-    const sorted = invoke('#' + arr, 'sortedArrayUsingComparator:',
-        [{ t: 'bl', sig: 'q@?@@', cb: 1 }]);
-    const line = invoke('#' + sorted, 'componentsJoinedByString:', [',']);
-    B.Release(sorted);
-    return line;
+    const sorted = invoke('#' + arr, 'sortedArrayUsingComparator:', [{ t: 'bl', sig: 'q@?@@', cb: 1 }]);
+    const part1 = 'id参数排序=' + invoke('#' + sorted, 'componentsJoinedByString:', [',']);
+
+    globalThis.__nb_cb_2 = a => {                   // sig='@@?@@@'：返回 id，参数是 id
+        const p = JSON.parse(a);
+        B.Release(p[0].v);
+        return JSON.stringify({ h: invoke('NSNumber', 'numberWithInt:', [42]) });   // 返回 id
+    };
+    // arguments 传 null：Apple 侧不支持用 JS 数组构造 NSArray（数组参数仅 Android 侧支持）
+    const expr = invoke('NSExpression', 'expressionForBlock:arguments:', [{ t: 'bl', sig: '@@?@@@', cb: 2 }, null]);
+    const holder = invoke('NSMutableArray', 'array', []);
+    const val = invoke('#' + expr, 'expressionValueWithObject:context:', [h(holder), null]);
+    const part2 = '返回id=' + invoke('#' + val, 'intValue', []);
+    return part1 + '  |  ' + part2;
 }
 
 function openSettings() {
@@ -130,7 +144,7 @@ try {
 
     btn.OnClicked.Add(function () {
         try {
-            txt.SetText(T('排序结果: ' + sortByLength()));
+            txt.SetText(T(blockIdDemo()));
             bg.SetColorAndOpacity(new UE.LinearColor(0.2, 0.9, 0.3, 0.45));   // 成功→绿
             openSettings();
         } catch (e) {
