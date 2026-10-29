@@ -1,5 +1,5 @@
-// Main.js 2.3.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到主 window 上
-const VERSION = '2.3.0';
+// Main.js 2.4.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到主 window 上
+const VERSION = '2.4.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -31,29 +31,24 @@ function invoke(target, method, args) {
     return r.v;                                     // 对象返回值就是句柄 number
 }
 
-// 点击：[[UIView alloc] initWithFrame:CGRectMake(...)] → 红色 → 加到主 window
-// 每步都打日志：万一崩溃，最后一行就指明是哪一步
+// 点击：[[UIView alloc] initWithFrame:CGRectMake(...)] → 红色 → 加到 App 自己的 window
+// 取窗口的讲究：keyWindow 有时是系统窗口（UITextEffectsWindow 之类），
+// 往系统窗口加子视图会触发 UIKit 内部断言（_didMoveFromWindow:toWindow:）直接 abort。
+// 所以优先用 delegate.window（App 自己的窗口），拿不到再回退 keyWindow。
 function addRedView() {
-    const alloc = invoke('UIView', 'alloc', []);
-    log('步骤1 alloc -> ' + alloc);
-
-    const view = invoke('#' + alloc, 'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);  // x,y,w,h
-    log('步骤2 initWithFrame -> ' + view);
-
-    const red = invoke('UIColor', 'redColor', []);
-    log('步骤3 UIColor.redColor -> ' + red);
-
-    invoke('#' + view, 'setBackgroundColor:', [h(red)]);
-    log('步骤4 setBackgroundColor 完成');
+    const view = invoke('#' + invoke('UIView', 'alloc', []), 'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);
+    invoke('#' + view, 'setBackgroundColor:', [h(invoke('UIColor', 'redColor', []))]);
+    log('已建红色视图 句柄=' + view + ' 主线程=' + invoke('NSThread', 'isMainThread', []));
 
     const app = invoke('UIApplication', 'sharedApplication', []);
-    log('步骤5 sharedApplication -> ' + app);
-
-    const win = invoke('#' + app, 'keyWindow', []);
-    log('步骤6 keyWindow -> ' + win);
+    const del = invoke('#' + app, 'delegate', []);
+    let win = del ? invoke('#' + del, 'window', []) : null;
+    log('delegate.window=' + win + (win ? '' : ' → 回退 keyWindow'));
+    if (!win) { win = invoke('#' + app, 'keyWindow', []); }
+    log('window 描述=' + invoke('#' + win, 'description', []));
 
     invoke('#' + win, 'addSubview:', [h(view)]);
-    log('步骤7 addSubview 完成，句柄=' + view);
+    log('addSubview 完成，句柄=' + view);
 }
 
 try {
