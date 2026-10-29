@@ -1,5 +1,5 @@
-// Main.js 2.2.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到主 window 上
-const VERSION = '2.2.0';
+// Main.js 2.3.0 —— 容器 + 中间一个按钮：点击创建一个红色 UIView(100x200) 加到主 window 上
+const VERSION = '2.3.0';
 
 let world = puerts.argv.getByName('World');
 
@@ -32,16 +32,28 @@ function invoke(target, method, args) {
 }
 
 // 点击：[[UIView alloc] initWithFrame:CGRectMake(...)] → 红色 → 加到主 window
+// 每步都打日志：万一崩溃，最后一行就指明是哪一步
 function addRedView() {
     const alloc = invoke('UIView', 'alloc', []);
-    const view  = invoke('#' + alloc, 'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);  // x,y,w,h
-    invoke('#' + view, 'setBackgroundColor:', [h(invoke('UIColor', 'redColor', []))]);
+    log('步骤1 alloc -> ' + alloc);
+
+    const view = invoke('#' + alloc, 'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);  // x,y,w,h
+    log('步骤2 initWithFrame -> ' + view);
+
+    const red = invoke('UIColor', 'redColor', []);
+    log('步骤3 UIColor.redColor -> ' + red);
+
+    invoke('#' + view, 'setBackgroundColor:', [h(red)]);
+    log('步骤4 setBackgroundColor 完成');
 
     const app = invoke('UIApplication', 'sharedApplication', []);
-    const win = invoke('#' + app, 'keyWindow', []);
-    invoke('#' + win, 'addSubview:', [h(view)]);
+    log('步骤5 sharedApplication -> ' + app);
 
-    log('已添加红色 UIView 句柄=' + view);
+    const win = invoke('#' + app, 'keyWindow', []);
+    log('步骤6 keyWindow -> ' + win);
+
+    invoke('#' + win, 'addSubview:', [h(view)]);
+    log('步骤7 addSubview 完成，句柄=' + view);
 }
 
 try {
