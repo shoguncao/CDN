@@ -1,6 +1,6 @@
 // Main.js 3.1.2 —— NativeBridge 能力演示页
 // 每个按钮演示一项能力：点击后显示「调用了什么 + 结果」，容器变绿=生效，变黄=失败
-const VERSION = '3.1.0';
+const VERSION = '3.1.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
