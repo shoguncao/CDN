@@ -170,7 +170,7 @@ try {
     // 结果区：显示"调用了什么 + 结果"
     const txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
     const txtSlot = canvas.AddChild(txt);
-    txtSlot.SetSize(new UE.Vector2D(s.X - 40, 150));
+    txtSlot.SetSize(new UE.Vector2D(s.X - 40, 120));
     txtSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + 15));
     txt.SetText(T('点击下面的按钮'));
 
@@ -183,30 +183,37 @@ function show(d, result, ok) {
         log(d.n + ' → ' + result);
     }
 
-    // 能力按钮：两列平铺在结果区下方；内容用 Image（UButton 运行时 new 的默认 Style 是空 brush）
+    // 造一个带文字的按钮（Button 只能有一个子节点，所以子节点放 TextBlock）
+    // 背景用 SetBackgroundColor 调深，配合默认白字，避免"纯色块看不出是什么"
+    function makeBtn(label, x, y, bw, bh, onClick, color) {
+        const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
+        btn.SetBackgroundColor(color || new UE.LinearColor(0.10, 0.32, 0.55, 1));
+        const t = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
+        t.SetText(T(label));                       // FText 是对象模式，必须转换
+        btn.AddChild(t);
+        const slot = canvas.AddChild(btn);
+        slot.SetSize(new UE.Vector2D(bw, bh));
+        slot.SetPosition(new UE.Vector2D(x, y));
+        btn.OnClicked.Add(onClick);
+        return btn;
+    }
+
+    // 能力按钮：两列平铺在结果区下方
     const bw = (s.X - 50) / 2;
     DEMOS.forEach(function (d, i) {
-        const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
-        const icon = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
-        icon.SetColorAndOpacity(new UE.LinearColor(0.2, 0.8, 1, 0.9));
-        btn.AddChild(icon);
-        const slot = canvas.AddChild(btn);
-        slot.SetSize(new UE.Vector2D(bw, 40));
-        slot.SetPosition(new UE.Vector2D(p.X + 20 + (i % 2) * (bw + 10), p.Y + 170 + ((i / 2) | 0) * 45));
-        btn.OnClicked.Add(function () {
-            try { show(d, d.f()); } catch (e) { show(d, '异常：' + e, false); }
-        });
+        makeBtn(d.n,
+            p.X + 20 + (i % 2) * (bw + 10),
+            p.Y + 145 + ((i / 2) | 0) * 40,
+            bw, 36,
+            function () {
+                try { show(d, d.f()); } catch (e) { show(d, '异常：' + e, false); }
+            });
     });
 
-    // 关闭按钮：容器右上角外侧
-    const closeBtn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
-    const closeIcon = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
-    closeIcon.SetColorAndOpacity(new UE.LinearColor(1, 1, 1, 0.9));
-    closeBtn.AddChild(closeIcon);
-    const closeSlot = canvas.AddChild(closeBtn);
-    closeSlot.SetSize(new UE.Vector2D(64, 64));
-    closeSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 64));
-    closeBtn.OnClicked.Add(function () { w.RemoveFromViewport(); });
+    // 关闭按钮：容器右上角外侧（红底 ✕）
+    makeBtn('✕', p.X + s.X - 64, p.Y - 64, 64, 64,
+        function () { w.RemoveFromViewport(); },
+        new UE.LinearColor(0.6, 0.15, 0.15, 1));
 
     log('能力演示页已建 版本 ' + VERSION);
 } catch (e) {
