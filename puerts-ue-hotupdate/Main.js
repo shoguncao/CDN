@@ -1,7 +1,6 @@
-// Main.js 3.0.0 —— NativeBridge 功能自测页面
-// 两个按钮：①运行同步用例（覆盖所有类型与能力）②测试异步回调（block + Pump）
-// 判读：容器变绿=全部通过，变黄=有失败；结果明细显示在文字块里
-const VERSION = '3.0.0';
+// Main.js 3.1.0 —— NativeBridge 能力演示页
+// 每个按钮演示一项能力：点击后显示「调用了什么 + 结果」，容器变绿=生效，变黄=失败
+const VERSION = '3.1.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -9,8 +8,8 @@ const PAD = ' '.repeat(24);                       // PrintString 位置写死在
 function log(m) {
     UE.KismetSystemLibrary.PrintString(world, PAD + m, true, true, new UE.LinearColor(0.2, 0.8, 1, 1), 60);
 }
-// Puerts 默认定义了 PUERTS_FTEXT_AS_OBJECT（JsEnv.Build.cs:87），
-// 即 FText 是对象模式：SetText 直接传 JS 字符串会被当指针解析而崩溃，必须先转换
+// Puerts 默认定义了 PUERTS_FTEXT_AS_OBJECT（JsEnv.Build.cs:87）：
+// FText 是对象模式，SetText 直接传 JS 字符串会被当指针解析而崩溃，必须先转换
 function T(s) { return UE.KismetTextLibrary.Conv_StringToText(s); }
 
 const B = require('cpp').NativeBridge;
@@ -24,133 +23,130 @@ function arg(v) {
 }
 const h = id => ({ t: 'h', v: id });              // 传对象句柄
 
-// target: 类名（类方法）或 '#句柄'（实例方法）；opts: 'thread=current' 表示不切主线程
+// target: 类名（类方法）或 '#句柄'（实例方法）；opts 传 'thread=current' 表示不切主线程
 function invoke(target, method, args, sig, opts) {
     const r = JSON.parse(B.Invoke(String(target), method,
         JSON.stringify((args || []).map(arg)), sig || '', opts || ''));
     if (r.t === 'e') throw new Error(r.v);
     return r.v;
 }
-// 调用 C 函数：sig 第一个类型编码是返回值，其余为参数
+// C 函数：sig 第一个类型编码是返回值，其余为参数
 function callC(name, sig, args) {
     const r = JSON.parse(B.CallCFunc(name, sig, JSON.stringify((args || []).map(arg))));
     if (r.t === 'e') throw new Error(r.v);
     return r;
 }
+// 期望抛错的用例：把错误文本当作"生效的证据"返回
+function expectErr(fn) {
+    try { fn(); return '未按预期报错 ✗'; } catch (e) { return '按预期报错：' + e; }
+}
 
-// 异步回调（OC block 常在非 JS 线程触发）先排队，靠 Pump 取回
+// 异步回调（OC block 常在非 JS 线程触发）会先排队，靠 Pump 取回
 setInterval(() => B.Pump(), 200);
 
-// ============================================================ 同步用例
-// 每项返回 '' 表示通过，非空字符串表示失败原因
-const CASES = [
-    ['类方法→对象句柄', () => typeof invoke('NSMutableArray', 'array', []) === 'number' ? '' : '不是数字'],
+// ============================================================ 每项能力一个按钮
+// n=按钮名  c=展示用的调用代码  f=执行并返回结果字符串
+let asyncGot = false;
 
-    ['实例方法+参数', () => {
-        const a = invoke('NSMutableArray', 'array', []);
-        invoke('#' + a, 'addObject:', ['x']);
-        return invoke('#' + a, 'count', []) === 1 ? '' : 'count 不对';
-    }],
+const DEMOS = [
+    { n: '类方法→句柄', c: "invoke('NSMutableArray','array',[])",
+      f: () => '句柄 = ' + invoke('NSMutableArray', 'array', []) },
 
-    ['int 参数与返回', () =>
-        invoke('#' + invoke('NSNumber', 'numberWithInt:', [42]), 'intValue', []) === 42 ? '' : '值不对'],
+    { n: '实例方法+参数', c: "invoke('#'+a,'addObject:',['x'])\ninvoke('#'+a,'count',[])",
+      f: () => { const a = invoke('NSMutableArray', 'array', []);
+                 invoke('#' + a, 'addObject:', ['x']);
+                 return 'count = ' + invoke('#' + a, 'count', []); } },
 
-    ['double 参数与返回', () =>
-        invoke('#' + invoke('NSNumber', 'numberWithDouble:', [3.5]), 'doubleValue', []) === 3.5 ? '' : '值不对'],
+    { n: 'int', c: "invoke('NSNumber','numberWithInt:',[42]) → intValue",
+      f: () => 'intValue = ' + invoke('#' + invoke('NSNumber', 'numberWithInt:', [42]), 'intValue', []) },
 
-    ['bool 参数与返回', () =>
-        invoke('#' + invoke('NSNumber', 'numberWithBool:', [true]), 'boolValue', []) === 1 ? '' : '值不为 1'],
+    { n: 'double', c: "invoke('NSNumber','numberWithDouble:',[3.5]) → doubleValue",
+      f: () => 'doubleValue = ' + invoke('#' + invoke('NSNumber', 'numberWithDouble:', [3.5]), 'doubleValue', []) },
 
-    ['char* 参数 + NSString 返回', () =>
-        invoke('NSString', 'stringWithUTF8String:', ['abc']) === 'abc' ? '' : '返回值不对'],
+    { n: 'bool', c: "invoke('NSNumber','numberWithBool:',[true]) → boolValue",
+      f: () => 'boolValue = ' + invoke('#' + invoke('NSNumber', 'numberWithBool:', [true]), 'boolValue', []) },
 
-    ['Class(#) 参数', () => {
-        const a = invoke('NSMutableArray', 'array', []);
-        return invoke('#' + a, 'isKindOfClass:', [{ t: 's', v: 'NSArray' }]) === 1 ? '' : '返回非 1';
-    }],
+    { n: 'char* 参数', c: "invoke('NSString','stringWithUTF8String:',['abc'])",
+      f: () => '返回 = ' + invoke('NSString', 'stringWithUTF8String:', ['abc']) },
 
-    ['SEL(:) 参数', () => {
-        const a = invoke('NSMutableArray', 'array', []);
-        return invoke('#' + a, 'respondsToSelector:', [{ t: 's', v: 'count' }]) === 1 ? '' : '返回非 1';
-    }],
+    { n: 'Class(#) 参数', c: "invoke('#'+a,'isKindOfClass:',[{t:'s',v:'NSArray'}])",
+      f: () => '返回 = ' + invoke('#' + invoke('NSMutableArray', 'array', []),
+                    'isKindOfClass:', [{ t: 's', v: 'NSArray' }]) },
 
-    ['结构体参数与返回(16B)', () => {
-        const v = invoke('NSValue', 'valueWithRange:', [{ t: 'st', v: [3, 7] }]);
-        return invoke('#' + v, 'rangeValue', []).join(',') === '3,7' ? '' : '值不对';
-    }],
+    { n: 'SEL(:) 参数', c: "invoke('#'+a,'respondsToSelector:',[{t:'s',v:'count'}])",
+      f: () => '返回 = ' + invoke('#' + invoke('NSMutableArray', 'array', []),
+                    'respondsToSelector:', [{ t: 's', v: 'count' }]) },
 
-    ['大结构体(32B 嵌套)', () => {
-        const v = invoke('NSValue', 'valueWithRect:', [{ t: 'st', v: [10, 20, 100, 200] }]);
-        return invoke('#' + v, 'rectValue', []).join(',') === '10,20,100,200' ? '' : '值不对';
-    }],
+    { n: '结构体 16B', c: "invoke('NSValue','valueWithRange:',[{t:'st',v:[3,7]}])\n→ rangeValue",
+      f: () => 'rangeValue = [' + invoke('#' + invoke('NSValue', 'valueWithRange:', [{ t: 'st', v: [3, 7] }]),
+                    'rangeValue', []).join(',') + ']' },
 
-    ['容器返回 + j 字段', () => {
-        const r = JSON.parse(B.Invoke('NSArray', 'arrayWithObject:', JSON.stringify([arg('a')]), '', ''));
-        return r.t === 'h' && r.j === '["a"]' ? '' : 't=' + r.t + ' j=' + r.j;
-    }],
+    { n: '结构体 32B', c: "invoke('NSValue','valueWithRect:',[{t:'st',v:[10,20,100,200]}])\n→ rectValue",
+      f: () => 'rectValue = [' + invoke('#' + invoke('NSValue', 'valueWithRect:', [{ t: 'st', v: [10, 20, 100, 200] }]),
+                    'rectValue', []).join(',') + ']' },
 
-    ['OC 常量(dlsym)', () => JSON.parse(B.Const('NSURLNameKey')).v === 'NSURLNameKey' ? '' : '值不对'],
+    { n: '容器 j 字段', c: "B.Invoke('NSArray','arrayWithObject:',[{t:'s',v:'a'}])",
+      f: () => { const r = JSON.parse(B.Invoke('NSArray', 'arrayWithObject:', JSON.stringify([arg('a')]), '', ''));
+                 return '句柄=' + r.v + '  内容 j=' + r.j; } },
 
-    ['对象参数(传句柄)', () => {
-        const a = invoke('NSMutableArray', 'array', []);
-        const inner = invoke('NSMutableArray', 'array', []);
-        invoke('#' + a, 'addObject:', [h(inner)]);
-        return invoke('#' + a, 'count', []) === 1 ? '' : 'count 不对';
-    }],
+    { n: 'OC 常量', c: "B.Const('NSURLNameKey')",
+      f: () => '值 = ' + JSON.parse(B.Const('NSURLNameKey')).v },
 
-    ['thread=current 选项', () => {
-        const v = invoke('NSValue', 'valueWithRange:', [{ t: 'st', v: [1, 2] }], '', 'thread=current');
-        return invoke('#' + v, 'rangeValue', [], '', 'thread=current').join(',') === '1,2' ? '' : '值不对';
-    }],
+    { n: '对象参数', c: "invoke('#'+a,'addObject:',[{t:'h',v:inner}])",
+      f: () => { const a = invoke('NSMutableArray', 'array', []);
+                 const inner = invoke('NSMutableArray', 'array', []);
+                 invoke('#' + a, 'addObject:', [h(inner)]);
+                 return 'count = ' + invoke('#' + a, 'count', []); } },
 
-    ['block 同步回调(带 id 参数)', () => {
-        const a = invoke('NSMutableArray', 'array', []);
-        ['a', 'b', 'c'].forEach(x => invoke('#' + a, 'addObject:', [x]));
-        let n = 0;
-        globalThis.__nb_cb_1 = () => { n++; return ''; };
-        invoke('#' + a, 'enumerateObjectsUsingBlock:',
-            [{ t: 'bl', sig: 'v@?@Q^B', cb: 1 }], '', 'thread=current');   // 不切线程，回调才能直接进 JS
-        return n === 3 ? '' : '回调次数=' + n;
-    }],
+    { n: 'thread=current', c: "invoke('NSValue','valueWithRange:',[{t:'st',v:[1,2]}],'','thread=current')",
+      f: () => 'rangeValue = [' + invoke('#' + invoke('NSValue', 'valueWithRange:', [{ t: 'st', v: [1, 2] }], '', 'thread=current'),
+                    'rangeValue', [], '', 'thread=current').join(',') + ']' },
 
-    ['C 函数(dispatch_get_global_queue)', () =>
-        callC('dispatch_get_global_queue', '@qQ', [0, 0]).t === 'h' ? '' : '返回值不是句柄'],
+    { n: 'block 回调', c: "invoke('#'+a,'enumerateObjectsUsingBlock:',[{t:'bl',sig:'v@?@Q^B',cb:1}],'','thread=current')",
+      f: () => { const a = invoke('NSMutableArray', 'array', []);
+                 ['a', 'b', 'c'].forEach(x => invoke('#' + a, 'addObject:', [x]));
+                 let n = 0;
+                 globalThis.__nb_cb_1 = () => { n++; return ''; };
+                 invoke('#' + a, 'enumerateObjectsUsingBlock:',
+                     [{ t: 'bl', sig: 'v@?@Q^B', cb: 1 }], '', 'thread=current');
+                 return 'block 被调用 ' + n + ' 次（应为 3）'; } },
 
-    ['错误处理：类不存在', () => {
-        try { invoke('NoSuchClassXX', 'foo', []); return '竟然没报错'; } catch (e) { return ''; }
-    }],
+    { n: 'C 函数', c: "B.CallCFunc('dispatch_get_global_queue','@qQ',[0,0])",
+      f: () => { const r = callC('dispatch_get_global_queue', '@qQ', [0, 0]);
+                 return '返回类型=' + r.t + ' 句柄=' + r.v; } },
 
-    ['Release 后句柄失效', () => {
-        const a = invoke('NSMutableArray', 'array', []);
-        B.Release(a);
-        try { invoke('#' + a, 'count', []); return '释放后仍可用'; } catch (e) { return ''; }
-    }],
+    { n: 'UIView(红块)', c: "[[UIView alloc] initWithFrame:CGRectMake(20,100,100,200)]\n→ setBackgroundColor → addSubview",
+      f: () => { const v = invoke('#' + invoke('UIView', 'alloc', []),
+                     'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);
+                 invoke('#' + v, 'setBackgroundColor:', [h(invoke('UIColor', 'redColor', []))]);
+                 const app = invoke('UIApplication', 'sharedApplication', []);
+                 const win = invoke('#' + app, 'keyWindow', []);
+                 let rvc = invoke('#' + win, 'rootViewController', []);
+                 if (!rvc) { rvc = invoke('#' + invoke('UIViewController', 'alloc', []), 'init', []);
+                             invoke('#' + win, 'setRootViewController:', [h(rvc)]); }
+                 invoke('#' + invoke('#' + rvc, 'view', []), 'addSubview:', [h(v)]);
+                 return '已添加到界面（左侧红色 100×200）'; } },
+
+    { n: '异步回调+Pump', c: "invoke('#'+q,'addOperationWithBlock:',[{t:'bl',sig:'v@?',cb:2}])\n→ 靠 Pump 取回",
+      f: () => { asyncGot = false;
+                 globalThis.__nb_cb_2 = () => { asyncGot = true; return ''; };
+                 const q = invoke('#' + invoke('NSOperationQueue', 'alloc', []), 'init', []);
+                 invoke('#' + q, 'addOperationWithBlock:', [{ t: 'bl', sig: 'v@?', cb: 2 }]);
+                 let waited = 0;
+                 const t = setInterval(function () {
+                     waited += 200;
+                     if (asyncGot) { clearInterval(t); show(asyncDemo, '回调已收到 ✓（' + waited + 'ms）'); }
+                     else if (waited >= 3000) { clearInterval(t); show(asyncDemo, '3 秒未收到 ✗', false); }
+                 }, 200);
+                 return '已投递到后台队列，等待回调…'; } },
+
+    { n: '错误：类不存在', c: "invoke('NoSuchClassXX','foo',[])",
+      f: () => expectErr(() => invoke('NoSuchClassXX', 'foo', [])) },
+
+    { n: 'Release 失效', c: "B.Release(a) 后再 invoke('#'+a,'count',[])",
+      f: () => expectErr(() => { const a = invoke('NSMutableArray', 'array', []);
+                                 B.Release(a); invoke('#' + a, 'count', []); }) },
 ];
-
-function runSyncTests() {
-    let pass = 0;
-    const bad = [];
-    for (const [name, fn] of CASES) {
-        try {
-            const why = fn();
-            if (why === '') { pass++; } else { bad.push('✗ ' + name + '：' + why); }
-        } catch (e) {
-            bad.push('✗ ' + name + '：' + e);
-        }
-    }
-    return { pass: pass, total: CASES.length, bad: bad };
-}
-
-// ============================================================ 异步用例（block 在别的队列触发 → Pump）
-let asyncDone = false;
-
-function startAsyncTest() {
-    asyncDone = false;
-    globalThis.__nb_cb_2 = () => { asyncDone = true; return ''; };
-    const q = invoke('#' + invoke('NSOperationQueue', 'alloc', []), 'init', []);
-    invoke('#' + q, 'addOperationWithBlock:', [{ t: 'bl', sig: 'v@?', cb: 2 }]);   // 加到后台队列
-    return q;
-}
 
 try {
     const pc = UE.GameplayStatics.GetPlayerController(world, 0);
@@ -158,7 +154,7 @@ try {
     w.AddToViewport(0);                              // 必须：UMG 在这一步才建好控件树
     const canvas = w.WidgetTree.RootWidget;
 
-    // 容器：半透明底，居中；颜色用作成功/失败反馈
+    // 容器：居中；颜色用作"是否生效"的反馈
     const bg = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
     bg.SetColorAndOpacity(new UE.LinearColor(1, 1, 1, 0.2));
     const bgSlot = canvas.AddChild(bg);
@@ -171,61 +167,35 @@ try {
     bgSlot.SetSize(s);
     bgSlot.SetPosition(p);
 
-    // 结果文字块（多行）
+    // 结果区：显示"调用了什么 + 结果"
     const txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
     const txtSlot = canvas.AddChild(txt);
-    txtSlot.SetSize(new UE.Vector2D(s.X - 40, s.Y - 140));
-    txtSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + 20));
-    txt.SetText(T('点击按钮开始测试'));
+    txtSlot.SetSize(new UE.Vector2D(s.X - 40, 150));
+    txtSlot.SetPosition(new UE.Vector2D(p.X + 20, p.Y + 15));
+    txt.SetText(T('点击下面的按钮'));
 
-    // 按钮：内容用 Image，UButton 运行时 new 的默认 Style 是空 brush
-    function addBtn(label, top, onClick) {
+    const asyncDemo = DEMOS.find(x => x.n.indexOf('异步') === 0);   // 异步那项（回调在外面异步到达）
+
+function show(d, result, ok) {
+        txt.SetText(T('【' + d.n + '】\n' + d.c + '\n→ ' + result + (ok === false ? '  ✗' : '  ✓')));
+        bg.SetColorAndOpacity(ok === false ? new UE.LinearColor(1, 0.9, 0.1, 0.5)     // 黄=失败
+                                           : new UE.LinearColor(0.2, 0.9, 0.3, 0.35)); // 绿=生效
+        log(d.n + ' → ' + result);
+    }
+
+    // 能力按钮：两列平铺在结果区下方；内容用 Image（UButton 运行时 new 的默认 Style 是空 brush）
+    const bw = (s.X - 50) / 2;
+    DEMOS.forEach(function (d, i) {
         const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
         const icon = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
         icon.SetColorAndOpacity(new UE.LinearColor(0.2, 0.8, 1, 0.9));
         btn.AddChild(icon);
         const slot = canvas.AddChild(btn);
-        slot.SetSize(new UE.Vector2D(s.X - 40, 60));
-        slot.SetPosition(new UE.Vector2D(p.X + 20, top));
-        btn.OnClicked.Add(onClick);
-        return btn;
-    }
-
-    function show(text, ok) {
-        txt.SetText(T(text));
-        bg.SetColorAndOpacity(ok ? new UE.LinearColor(0.2, 0.9, 0.3, 0.35)    // 绿=通过
-                                : new UE.LinearColor(1, 0.9, 0.1, 0.5));      // 黄=失败
-        log(text.replace(/\n/g, ' | '));
-    }
-
-    addBtn('run', p.Y + s.Y - 130, function () {
-        try {
-            const r = runSyncTests();
-            show('同步用例：' + r.pass + '/' + r.total + ' 通过\n' +
-                 (r.bad.length ? r.bad.join('\n') : '全部通过'), r.bad.length === 0);
-        } catch (e) {
-            show('测试崩溃: ' + e, false);
-        }
-    });
-
-    addBtn('async', p.Y + s.Y - 65, function () {
-        try {
-            startAsyncTest();
-            txt.SetText(T('异步回调：等待中…（靠 Pump 取回）'));
-            let waited = 0;
-            const timer = setInterval(function () {
-                waited += 200;
-                if (asyncDone) {
-                    clearInterval(timer);
-                    show('异步回调：收到 ✓', true);
-                } else if (waited >= 3000) {
-                    clearInterval(timer);
-                    show('异步回调：3 秒未收到 ✗', false);
-                }
-            }, 200);
-        } catch (e) {
-            show('异步测试失败: ' + e, false);
-        }
+        slot.SetSize(new UE.Vector2D(bw, 40));
+        slot.SetPosition(new UE.Vector2D(p.X + 20 + (i % 2) * (bw + 10), p.Y + 170 + ((i / 2) | 0) * 45));
+        btn.OnClicked.Add(function () {
+            try { show(d, d.f()); } catch (e) { show(d, '异常：' + e, false); }
+        });
     });
 
     // 关闭按钮：容器右上角外侧
@@ -238,7 +208,7 @@ try {
     closeSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 64));
     closeBtn.OnClicked.Add(function () { w.RemoveFromViewport(); });
 
-    log('测试页面已建 版本 ' + VERSION);
+    log('能力演示页已建 版本 ' + VERSION);
 } catch (e) {
     log('错误: ' + e);
 }
