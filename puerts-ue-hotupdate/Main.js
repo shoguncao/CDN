@@ -1,6 +1,6 @@
-// Main.js 3.2.0 —— NativeBridge 能力演示页（三页：功能类型 / iOS / Android）
+// Main.js 3.3.0 —— NativeBridge 能力演示页（三页：功能类型 / iOS / Android）
 // 点按钮后显示「调用了什么 + 结果」，容器变绿=生效、变黄=失败；底部左右箭头翻页
-const VERSION = '3.2.0';
+const VERSION = '3.3.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -45,8 +45,32 @@ function expectErr(fn) {
 setInterval(() => B.Pump(), 200);
 let asyncGot = false;
 
+// 平台判断：随便调一个 iOS 才有的类，抛错就是 Android（不额外加原生接口）
+let IS_IOS = true;
+try { invoke('NSProcessInfo', 'processInfo', []); } catch (e) { IS_IOS = false; }
+const CUR = IS_IOS ? 'ios' : 'android';
+const OTHER = IS_IOS ? 'Android' : 'iOS';
+
 // ============================================================ 第一页：功能类型（场景）
-const SCENE_DEMOS = [
+// 场景类功能两端实现完全不同，所以按平台各给一份
+const SCENE_ANDROID = [
+    { n: '打开系统设置', c: "new Intent('android.settings.SETTINGS')\n@activity.startActivity(intent)",
+      f: () => { const it = invoke('android.content.Intent', '<init>', ['android.settings.SETTINGS']);
+                 invoke('@activity', 'startActivity', [h(it)]);
+                 return '已启动（设置界面会打开）'; } },
+    { n: 'Toast 提示', c: "Toast.makeText(@activity.getApplicationContext(),'来自 JS',0).show()",
+      f: () => { const ctx = invoke('@activity', 'getApplicationContext', []);
+                 const toast = invoke('android.widget.Toast', 'makeText', [h(ctx), '来自 JS 的提示', 0]);
+                 invoke('#' + toast, 'show', []);
+                 return '已弹出 Toast（屏幕下方）'; } },
+    { n: '读取应用信息', c: "@activity.getPackageManager().getPackageInfo(pkg,0)",
+      f: () => { const pkg = invoke('@activity', 'getPackageName', []);
+                 const pm = invoke('@activity', 'getPackageManager', []);
+                 const info = invoke('#' + pm, 'getPackageInfo', [pkg, 0]);
+                 return '包名=' + pkg + ' 句柄=' + info; } },
+];
+
+const SCENE_IOS = [
     { n: '打开系统设置', c: "NSURL('app-settings:') → UIApplication\nopenURL:options:completionHandler:",
       f: () => { const url = invoke('NSURL', 'URLWithString:', ['app-settings:']);
                  const app = invoke('UIApplication', 'sharedApplication', []);
@@ -81,7 +105,8 @@ const SCENE_DEMOS = [
                  }, 200);
                  return '已投递到后台队列，等待回调…'; } },
 ];
-const asyncDemo = SCENE_DEMOS[SCENE_DEMOS.length - 1];
+const SCENE_DEMOS = IS_IOS ? SCENE_IOS : SCENE_ANDROID;
+const asyncDemo = SCENE_IOS[SCENE_IOS.length - 1];
 
 // ============================================================ 第二页：iOS 能力
 const IOS_DEMOS = [
@@ -157,9 +182,9 @@ const ANDROID_DEMOS = [
 ];
 
 const PAGES = [
-    { name: '功能类型', demos: SCENE_DEMOS },
-    { name: 'iOS',      demos: IOS_DEMOS },
-    { name: 'Android',  demos: ANDROID_DEMOS },
+    { name: '功能类型',              demos: SCENE_DEMOS },
+    { name: 'iOS（当前系统不支持则留空）', platform: 'ios',     demos: IOS_DEMOS },
+    { name: 'Android（同上）',        platform: 'android', demos: ANDROID_DEMOS },
 ];
 
 try {
@@ -224,11 +249,17 @@ try {
         pageBtns = [];
         const page = PAGES[pageIdx];
         title.SetText(T('第 ' + (pageIdx + 1) + '/' + PAGES.length + ' 页：' + page.name));
+        if (page.platform && page.platform !== CUR) {          // 另一平台的页：只提示，不建按钮
+            txt.SetText(T('此页是 ' + (page.platform === 'ios' ? 'iOS' : 'Android') +
+                          ' 专用\n当前运行在 ' + (IS_IOS ? 'iOS' : 'Android') + '，接口不可用'));
+            bg.SetColorAndOpacity(new UE.LinearColor(1, 1, 1, 0.2));
+            return;
+        }
         const bw = (s.X - 50) / 2;
         page.demos.forEach(function (d, i) {
             pageBtns.push(makeBtn(d.n,
                 p.X + 20 + (i % 2) * (bw + 10),
-                p.Y + 160 + ((i / 2) | 0) * 40,
+                p.Y + 175 + ((i / 2) | 0) * 40,
                 bw, 36,
                 function () { try { show(d, d.f()); } catch (e) { show(d, '异常：' + e, false); } }));
         });
