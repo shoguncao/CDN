@@ -1,4 +1,4 @@
-// Main.js 3.1.0 —— NativeBridge 能力演示页
+// Main.js 3.1.2 —— NativeBridge 能力演示页
 // 每个按钮演示一项能力：点击后显示「调用了什么 + 结果」，容器变绿=生效，变黄=失败
 const VERSION = '3.1.0';
 
@@ -49,7 +49,7 @@ setInterval(() => B.Pump(), 200);
 let asyncGot = false;
 
 const DEMOS = [
-    { n: '类方法→句柄', c: "invoke('NSMutableArray','array',[])",
+    { n: '类方法→对象句柄', c: "invoke('NSMutableArray','array',[])",
       f: () => '句柄 = ' + invoke('NSMutableArray', 'array', []) },
 
     { n: '实例方法+参数', c: "invoke('#'+a,'addObject:',['x'])\ninvoke('#'+a,'count',[])",
@@ -57,13 +57,13 @@ const DEMOS = [
                  invoke('#' + a, 'addObject:', ['x']);
                  return 'count = ' + invoke('#' + a, 'count', []); } },
 
-    { n: 'int', c: "invoke('NSNumber','numberWithInt:',[42]) → intValue",
+    { n: 'int 参数/返回', c: "invoke('NSNumber','numberWithInt:',[42]) → intValue",
       f: () => 'intValue = ' + invoke('#' + invoke('NSNumber', 'numberWithInt:', [42]), 'intValue', []) },
 
-    { n: 'double', c: "invoke('NSNumber','numberWithDouble:',[3.5]) → doubleValue",
+    { n: 'double 参数/返回', c: "invoke('NSNumber','numberWithDouble:',[3.5]) → doubleValue",
       f: () => 'doubleValue = ' + invoke('#' + invoke('NSNumber', 'numberWithDouble:', [3.5]), 'doubleValue', []) },
 
-    { n: 'bool', c: "invoke('NSNumber','numberWithBool:',[true]) → boolValue",
+    { n: 'bool 参数/返回', c: "invoke('NSNumber','numberWithBool:',[true]) → boolValue",
       f: () => 'boolValue = ' + invoke('#' + invoke('NSNumber', 'numberWithBool:', [true]), 'boolValue', []) },
 
     { n: 'char* 参数', c: "invoke('NSString','stringWithUTF8String:',['abc'])",
@@ -77,32 +77,32 @@ const DEMOS = [
       f: () => '返回 = ' + invoke('#' + invoke('NSMutableArray', 'array', []),
                     'respondsToSelector:', [{ t: 's', v: 'count' }]) },
 
-    { n: '结构体 16B', c: "invoke('NSValue','valueWithRange:',[{t:'st',v:[3,7]}])\n→ rangeValue",
+    { n: '结构体16B(NSRange)', c: "invoke('NSValue','valueWithRange:',[{t:'st',v:[3,7]}])\n→ rangeValue",
       f: () => 'rangeValue = [' + invoke('#' + invoke('NSValue', 'valueWithRange:', [{ t: 'st', v: [3, 7] }]),
                     'rangeValue', []).join(',') + ']' },
 
-    { n: '结构体 32B', c: "invoke('NSValue','valueWithRect:',[{t:'st',v:[10,20,100,200]}])\n→ rectValue",
+    { n: '结构体32B(CGRect)', c: "invoke('NSValue','valueWithRect:',[{t:'st',v:[10,20,100,200]}])\n→ rectValue",
       f: () => 'rectValue = [' + invoke('#' + invoke('NSValue', 'valueWithRect:', [{ t: 'st', v: [10, 20, 100, 200] }]),
                     'rectValue', []).join(',') + ']' },
 
-    { n: '容器 j 字段', c: "B.Invoke('NSArray','arrayWithObject:',[{t:'s',v:'a'}])",
+    { n: '容器返回 j 字段', c: "B.Invoke('NSArray','arrayWithObject:',[{t:'s',v:'a'}])",
       f: () => { const r = JSON.parse(B.Invoke('NSArray', 'arrayWithObject:', JSON.stringify([arg('a')]), '', ''));
                  return '句柄=' + r.v + '  内容 j=' + r.j; } },
 
-    { n: 'OC 常量', c: "B.Const('NSURLNameKey')",
+    { n: 'OC 常量(dlsym)', c: "B.Const('NSURLNameKey')",
       f: () => '值 = ' + JSON.parse(B.Const('NSURLNameKey')).v },
 
-    { n: '对象参数', c: "invoke('#'+a,'addObject:',[{t:'h',v:inner}])",
+    { n: '对象参数(传句柄)', c: "invoke('#'+a,'addObject:',[{t:'h',v:inner}])",
       f: () => { const a = invoke('NSMutableArray', 'array', []);
                  const inner = invoke('NSMutableArray', 'array', []);
                  invoke('#' + a, 'addObject:', [h(inner)]);
                  return 'count = ' + invoke('#' + a, 'count', []); } },
 
-    { n: 'thread=current', c: "invoke('NSValue','valueWithRange:',[{t:'st',v:[1,2]}],'','thread=current')",
+    { n: '不切主线程(thread)', c: "invoke('NSValue','valueWithRange:',[{t:'st',v:[1,2]}],'','thread=current')",
       f: () => 'rangeValue = [' + invoke('#' + invoke('NSValue', 'valueWithRange:', [{ t: 'st', v: [1, 2] }], '', 'thread=current'),
                     'rangeValue', [], '', 'thread=current').join(',') + ']' },
 
-    { n: 'block 回调', c: "invoke('#'+a,'enumerateObjectsUsingBlock:',[{t:'bl',sig:'v@?@Q^B',cb:1}],'','thread=current')",
+    { n: 'block 回调(id参数)', c: "invoke('#'+a,'enumerateObjectsUsingBlock:',[{t:'bl',sig:'v@?@Q^B',cb:1}],'','thread=current')",
       f: () => { const a = invoke('NSMutableArray', 'array', []);
                  ['a', 'b', 'c'].forEach(x => invoke('#' + a, 'addObject:', [x]));
                  let n = 0;
@@ -111,11 +111,11 @@ const DEMOS = [
                      [{ t: 'bl', sig: 'v@?@Q^B', cb: 1 }], '', 'thread=current');
                  return 'block 被调用 ' + n + ' 次（应为 3）'; } },
 
-    { n: 'C 函数', c: "B.CallCFunc('dispatch_get_global_queue','@qQ',[0,0])",
+    { n: 'C 函数(dispatch)', c: "B.CallCFunc('dispatch_get_global_queue','@qQ',[0,0])",
       f: () => { const r = callC('dispatch_get_global_queue', '@qQ', [0, 0]);
                  return '返回类型=' + r.t + ' 句柄=' + r.v; } },
 
-    { n: 'UIView(红块)', c: "[[UIView alloc] initWithFrame:CGRectMake(20,100,100,200)]\n→ setBackgroundColor → addSubview",
+    { n: 'UIView(红块可见)', c: "[[UIView alloc] initWithFrame:CGRectMake(20,100,100,200)]\n→ setBackgroundColor → addSubview",
       f: () => { const v = invoke('#' + invoke('UIView', 'alloc', []),
                      'initWithFrame:', [{ t: 'st', v: [20, 100, 100, 200] }]);
                  invoke('#' + v, 'setBackgroundColor:', [h(invoke('UIColor', 'redColor', []))]);
@@ -140,10 +140,10 @@ const DEMOS = [
                  }, 200);
                  return '已投递到后台队列，等待回调…'; } },
 
-    { n: '错误：类不存在', c: "invoke('NoSuchClassXX','foo',[])",
+    { n: '报错:类不存在', c: "invoke('NoSuchClassXX','foo',[])",
       f: () => expectErr(() => invoke('NoSuchClassXX', 'foo', [])) },
 
-    { n: 'Release 失效', c: "B.Release(a) 后再 invoke('#'+a,'count',[])",
+    { n: 'Release 后失效', c: "B.Release(a) 后再 invoke('#'+a,'count',[])",
       f: () => expectErr(() => { const a = invoke('NSMutableArray', 'array', []);
                                  B.Release(a); invoke('#' + a, 'count', []); }) },
 ];
