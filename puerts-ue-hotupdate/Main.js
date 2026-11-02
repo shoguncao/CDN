@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.7.1';
+const VERSION = '4.7.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -217,13 +217,28 @@ try {
 
             const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
             const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
-            comp.SetWidget(w);
             comp.SetWidgetSpace(UE.EWidgetSpace.World);    // ← World 才建虚拟窗口（纹理模式）
+            comp.SetWidget(w);
             comp.SetDrawSize(new UE.Vector2D(DW, DH));
             comp.SetTwoSided(true);                        // 双面，避免背对相机看不见
-            comp.SetWorldLocation(wLoc);
-            comp.SetWorldRotation(UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc));   // 法线朝相机
-            comp.RegisterComponent();
+            comp.RegisterComponent();                      // 先注册（这一步才会建虚拟窗口）
+
+            // 摆放：反射里的名字是 K2_SetWorldLocation（SceneComponent.h:495），
+            // 第 3 个参数是 FHitResult&，必须传一个实例（bSweep=false 时不会用到内容）
+            const wRot = UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc);   // 法线朝相机
+            let placed = false;
+            const tries = [
+                ['K2_SetWorldLocationAndRotation', function () {
+                    comp.K2_SetWorldLocationAndRotation(wLoc, wRot, false, new UE.HitResult(), false); }],
+                ['K2_SetWorldLocation', function () {
+                    comp.K2_SetWorldLocation(wLoc, false, new UE.HitResult(), false);
+                    comp.K2_SetWorldRotation(wRot, false, new UE.HitResult(), false); }]
+            ];
+            for (const t of tries) {
+                try { t[1](); placed = true; log('摆放成功: ' + t[0]); break; }
+                catch (e) { log('摆放失败 ' + t[0] + ': ' + e); }
+            }
+            if (!placed) { log('⚠ 组件已注册但没摆好位置，可能看不见'); }
 
             log('纹理模式已设置：距离=' + Math.round(dist) + 'cm，DrawSize=' + DW + 'x' + DH);
 
