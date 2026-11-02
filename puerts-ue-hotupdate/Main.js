@@ -124,6 +124,18 @@ try {
     const rx  = vx * 0.35, rw = vx * 0.60;
     const wvY = vy * 0.55, wvH = vy * 0.38;          // WebView 区域（布局坐标）
 
+    // 探针：与 WebView 完全重叠的 UE 元素（UMG 绘制）。
+    // 加载网页后如果看不见 / 点不到，就说明 WebView 遮住了 UE 绘制的内容。
+    const probe = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
+    probe.SetColorAndOpacity(new UE.LinearColor(1, 0.2, 0.2, 1));      // 亮红，好辨认
+    const probeSlot = canvas.AddChild(probe);
+    probeSlot.SetSize(new UE.Vector2D(rw - 40, wvH - 40));
+    probeSlot.SetPosition(new UE.Vector2D(rx + 20, wvY + 20));
+
+    makeBtn('UE 按钮（被遮住就点不到）', rx + 40, wvY + 60, rw - 80, 50,
+        function () { show('UE 按钮被点到了 → 该区域 UE 仍在最上层'); },
+        new UE.LinearColor(0.9, 0.6, 0.1, 1));
+
     // ① 左边：只有一个按钮
     makeBtn('加载网页', vx * 0.05, vy * 0.42, vx * 0.28, 60, function () {
         try {
