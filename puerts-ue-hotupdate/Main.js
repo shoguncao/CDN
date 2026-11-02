@@ -1,7 +1,7 @@
-// Main.js 4.0.0 —— WebView 遮挡验证页
+// Main.js 4.1.0 —— WebView 遮挡验证页（加载 www.qq.com + 遮挡判定探针）
 // 目的：验证"原生 WebView 会不会遮住 UE 绘制的内容"
 // 布局：左边一个按钮；右边底部一个原生 WebView，其上方一个按钮
-const VERSION = '4.0.0';
+const VERSION = '4.1.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
