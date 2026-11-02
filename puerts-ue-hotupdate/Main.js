@@ -1,7 +1,7 @@
-// Main.js 4.5.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
+// Main.js 4.5.1 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.5.0';
+const VERSION = '4.5.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -12,6 +12,25 @@ function log(m) {
 // Puerts 默认定义 PUERTS_FTEXT_AS_OBJECT（JsEnv.Build.cs:87）：FText 是对象模式，
 // SetText 直接传 JS 字符串会被当指针解析而崩溃，必须先用 Conv_StringToText 转换
 function T(s) { return UE.KismetTextLibrary.Conv_StringToText(s); }
+
+const B = require('cpp').NativeBridge;
+
+function arg(v) {
+    if (v === null || v === undefined) return { t: 'n', v: 0 };
+    if (typeof v === 'boolean')        return { t: 'b', v: v };
+    if (typeof v === 'string')         return { t: 's', v: v };
+    if (typeof v === 'number')         return { t: Number.isInteger(v) ? 'i' : 'd', v: v };
+    return v;
+}
+const h = id => ({ t: 'h', v: id });              // 传对象句柄
+
+// target: 类名 / '#句柄'；opts 可传 'thread=current'
+function invoke(target, method, args, sig, opts) {
+    const r = JSON.parse(B.Invoke(String(target), method,
+        JSON.stringify((args || []).map(arg)), sig || '', opts || ''));
+    if (r.t === 'e') throw new Error(r.v);
+    return r.v;
+}
 
 const URL = 'https://www.qq.com';
 
