@@ -1,7 +1,7 @@
-// Main.js 4.2.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
+// Main.js 4.3.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.2.0';
+const VERSION = '4.3.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -14,6 +14,19 @@ function log(m) {
 function T(s) { return UE.KismetTextLibrary.Conv_StringToText(s); }
 
 const URL = 'https://www.qq.com';
+
+// 本地测试页：带一个点击计数器。点得到 → 计数增加；点不到 → 数字永远不变。
+// 用来回答"网页里的按钮能不能被看见、能不能被点"。
+const HTML = [
+    '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>',
+    '<body style="margin:0;padding:16px;font:16px -apple-system,sans-serif;background:#fff">',
+    '<h3 style="margin:0 0 12px">网页内按钮点击测试</h3>',
+    '<button id="b" style="width:100%;height:64px;font-size:20px;background:#0a84ff;color:#fff;border:0;border-radius:8px">点我</button>',
+    '<div id="n" style="font-size:26px;margin-top:14px;color:#111">点击次数：0</div>',
+    '<script>var c=0;document.getElementById("b").onclick=function(){c++;',
+    'document.getElementById("n").textContent="点击次数："+c;};</script>',
+    '</body></html>'
+].join('');
 
 try {
     const pc = UE.GameplayStatics.GetPlayerController(world, 0);
@@ -64,15 +77,16 @@ try {
     const wvY = vy * 0.55, wvH = vy * 0.38;
 
     // ① 左边：只有一个按钮
-    makeBtn('加载网页', vx * 0.05, vy * 0.42, vx * 0.28, 60, function () {
-        try { browser.LoadURL(URL); show('已加载 ' + URL); }
+    makeBtn('加载 www.qq.com', vx * 0.05, vy * 0.42, vx * 0.28, 60, function () {
+        try { browser.LoadURL(URL); show('已加载 ' + URL + '（网页里的按钮能点吗？）'); }
         catch (e) { show('加载失败: ' + e, false); }
     });
 
-    // ② 网页上方的按钮
-    makeBtn('重新加载', rx, vy * 0.47, rw, 50, function () {
-        try { browser.Reload(); show('已重新加载'); }
-        catch (e) { show('重载失败: ' + e, false); }
+    // ② 网页上方的按钮：加载本地测试页（点一下就 +1，用来判定能否点击）
+    // 注意 UE 4.27 的 UWebBrowser 没有 Reload()，重新加载就再 LoadURL / LoadString 一次
+    makeBtn('加载本地点击测试页', rx, vy * 0.47, rw, 50, function () {
+        try { browser.LoadString(HTML, 'about:blank'); show('已加载本地测试页，点网页里的大按钮看计数'); }
+        catch (e) { show('加载失败: ' + e, false); }
     }, new UE.LinearColor(0.15, 0.45, 0.35, 1));
 
     // 探针：与网页完全重叠的 UMG 元素（先加，层级在网页之下）
