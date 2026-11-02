@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.7.2';
+const VERSION = '4.7.3';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -242,21 +242,37 @@ try {
 
             log('纹理模式已设置：距离=' + Math.round(dist) + 'cm，DrawSize=' + DW + 'x' + DH);
 
-            // 硬证据：纹理模式下 UE 会把那个原生 WKWebView 隐藏，
-            // 这里切完 1.5 秒后遍历 window 的 subviews，打印每个视图的 hidden 状态
+            // 硬证据：纹理模式下 UE 会把那个原生 WKWebView 隐藏。
+            // 递归遍历视图树找 WKWebView（它不一定是 window 的直接子视图），
+            // 打印它的 hidden —— hidden=1 就是纹理模式生效
             setTimeout(function () {
+                let found = 0;
+                function walk(v, depth) {
+                    if (depth > 4) { return; }
+                    let isWV = 0;
+                    try { isWV = invoke('#' + v, 'isKindOfClass:', [{ t: 's', v: 'WKWebView' }]); } catch (e) { }
+                    if (isWV) {
+                        found++;
+                        log('★ 找到 WKWebView hidden=' + invoke('#' + v, 'isHidden', []) +
+                            ' frame=' + JSON.stringify(invoke('#' + v, 'frame', [])) +
+                            ' 层级' + depth);
+                    }
+                    let subs = null, n = 0;
+                    try {
+                        subs = invoke('#' + v, 'subviews', []);
+                        n = invoke('#' + subs, 'count', []);
+                    } catch (e) { return; }
+                    for (let i = 0; i < n; i++) {
+                        walk(invoke('#' + subs, 'objectAtIndex:', [i]), depth + 1);
+                    }
+                }
                 try {
                     const app2 = invoke('UIApplication', 'sharedApplication', []);
                     const del2 = invoke('#' + app2, 'delegate', []);
                     const win2 = del2 ? invoke('#' + del2, 'window', []) : invoke('#' + app2, 'keyWindow', []);
-                    const arr  = invoke('#' + win2, 'subviews', []);
-                    const n    = invoke('#' + arr, 'count', []);
-                    for (let i = 0; i < n; i++) {
-                        const v = invoke('#' + arr, 'objectAtIndex:', [i]);
-                        log('子视图' + i + ' hidden=' + invoke('#' + v, 'isHidden', []) +
-                            ' ' + invoke('#' + v, 'description', []));
-                    }
-                } catch (e) { log('检查子视图失败: ' + e); }
+                    walk(win2, 0);
+                    if (!found) { log('没找到 WKWebView（可能已被移除）'); }
+                } catch (e) { log('检查视图树失败: ' + e); }
             }, 1500);
 
             show('已切 World 空间（距离 ' + Math.round(dist) + 'cm）。看 3D 场景里有没有网页面片');
