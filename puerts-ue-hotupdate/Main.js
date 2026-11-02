@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.6.0';
+const VERSION = '4.6.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -191,34 +191,21 @@ try {
         }
     }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
 
-    // ④ 纹理模式 A：把整个 widget 交给 WidgetComponent（它用 SVirtualWindow → 虚拟窗口）
+    // ④ 纹理模式：把整个 widget 交给 WidgetComponent（它用 SVirtualWindow → 虚拟窗口）
+    // 注意：UWorld::SpawnActor / AActor::AddInstanceComponent 都不是蓝图接口（JS 调不到），
+    // 所以直接拿现成的 Pawn 当 Owner 建组件
     makeBtn('纹理·WidgetComponent', vx * 0.05, vy * 0.62, vx * 0.28, 46, function () {
         try {
-            w.RemoveFromViewport();                        // 必须在首次绘制前就位（ParentWindow 只缓存一次）
-            const actor = world.SpawnActor(UE.Actor.StaticClass(),
-                new UE.Transform(new UE.Rotator(0, 0, 0), new UE.Vector(0, 0, 0), new UE.Vector(1, 1, 1)));
-            const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), actor);
+            w.RemoveFromViewport();                        // ParentWindow 只缓存一次，必须先摘掉
+            const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
+            const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
             comp.SetWidget(w);
             comp.SetWidgetSpace(UE.EWidgetSpace.Screen);
             comp.SetDrawSize(new UE.Vector2D(vp.X, vp.Y));
             comp.RegisterComponent();
-            show('已交给 WidgetComponent（虚拟窗口）→ 看网页是否变纹理（可被 UE 内容遮挡）');
+            show('已交给 WidgetComponent(Owner=Pawn)。看网页是否变纹理、UE 内容能否盖住它');
         } catch (e) { show('切换失败: ' + e, false); }
     }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
-
-    // ⑤ 纹理模式 B：用 RetainerBox 包住 WebBrowser（SRetainerWidget 也用 SVirtualWindow）
-    makeBtn('纹理·RetainerBox', vx * 0.05, vy * 0.70, vx * 0.28, 46, function () {
-        try {
-            browser.RemoveFromParent();                    // 先从 canvas 摘下来
-            const box = UE.NewObject(UE.RetainerBox.StaticClass(), w.WidgetTree);
-            const bs = canvas.AddChild(box);
-            bs.SetSize(new UE.Vector2D(rw, wvH));
-            bs.SetPosition(new UE.Vector2D(rx, wvY));
-            bs.SetZOrder(20);
-            box.SetContent(browser);                       // 网页放进 Retainer（虚拟窗口）
-            show('已用 RetainerBox 包住网页 → 看是否变纹理（未验证路径，可能画不出来）');
-        } catch (e) { show('切换失败: ' + e, false); }
-    }, new UE.LinearColor(0.4, 0.3, 0.7, 1));
 
     // 关闭按钮
     makeBtn('✕', vx - 84, 20, 64, 64, function () { w.RemoveFromViewport(); },
