@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.6.1';
+const VERSION = '4.7.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -191,19 +191,35 @@ try {
         }
     }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
 
-    // ④ 纹理模式：把整个 widget 交给 WidgetComponent（它用 SVirtualWindow → 虚拟窗口）
-    // 注意：UWorld::SpawnActor / AActor::AddInstanceComponent 都不是蓝图接口（JS 调不到），
-    // 所以直接拿现成的 Pawn 当 Owner 建组件
+    // ④ 纹理模式：把 widget 交给 WidgetComponent，且必须是 World（3D）空间
+    // 关键：只有 Space != Screen 才会创建 SVirtualWindow（WidgetComponent.cpp:1631），
+    // Screen 空间走的是另一条渲染路径、不会触发纹理模式。
+    // RegisterComponent() 自己会把组件加进 Outer Actor 的组件数组（ActorComponent.h:913），
+    // 所以不需要 AddInstanceComponent（那个不是蓝图接口，JS 也调不到）。
     makeBtn('纹理·WidgetComponent', vx * 0.05, vy * 0.62, vx * 0.28, 46, function () {
         try {
             w.RemoveFromViewport();                        // ParentWindow 只缓存一次，必须先摘掉
+
+            const cam  = UE.GameplayStatics.GetPlayerCameraManager(world, 0);
+            const cLoc = cam.GetCameraLocation();
+            const cRot = cam.GetCameraRotation();
+            const fwd  = UE.KismetMathLibrary.GetForwardVector(cRot);
+            const dist = 300;
+            const wLoc = new UE.Vector(cLoc.X + fwd.X * dist, cLoc.Y + fwd.Y * dist, cLoc.Z + fwd.Z * dist);
+
             const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
             const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
             comp.SetWidget(w);
-            comp.SetWidgetSpace(UE.EWidgetSpace.Screen);
-            comp.SetDrawSize(new UE.Vector2D(vp.X, vp.Y));
+            comp.SetWidgetSpace(UE.EWidgetSpace.World);    // ← World 才建虚拟窗口（纹理模式）
+            comp.SetDrawSize(new UE.Vector2D(1280, 720));
+            comp.SetTwoSided(true);                        // 双面，避免背对相机看不见
+            comp.SetWorldLocation(wLoc);
+            comp.SetWorldRotation(UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc));
             comp.RegisterComponent();
-            show('已交给 WidgetComponent(Owner=Pawn)。看网页是否变纹理、UE 内容能否盖住它');
+
+            log('纹理模式已设置：位置=' + JSON.stringify([wLoc.X, wLoc.Y, wLoc.Z]) +
+                ' DrawSize=1280x720');
+            show('已切 World 空间 WidgetComponent。看网页是否出现在 3D 场景里、UMG 能否盖住它');
         } catch (e) { show('切换失败: ' + e, false); }
     }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
 
