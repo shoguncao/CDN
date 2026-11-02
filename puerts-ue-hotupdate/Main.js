@@ -42,7 +42,7 @@ try { invoke('NSProcessInfo', 'processInfo', []); } catch (e) { IS_IOS = false; 
 let webView = 0;                                   // webview 句柄
 
 function createWebView(x, y, w, hh) {              // 参数是原生坐标（iOS=点，Android=像素）
-    const url = 'https://example.com';
+    const url = 'https://www.qq.com';
     if (IS_IOS) {
         const wv = invoke('#' + invoke('WKWebView', 'alloc', []),
             'initWithFrame:', [{ t: 'st', v: [x, y, w, hh] }]);          // CGRect（32 字节结构体）
