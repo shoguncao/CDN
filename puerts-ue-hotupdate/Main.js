@@ -1,7 +1,7 @@
-// Main.js 4.4.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
+// Main.js 4.5.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.4.0';
+const VERSION = '4.5.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -124,6 +124,53 @@ try {
     bSlot.SetSize(new UE.Vector2D(rw, wvH));
     bSlot.SetPosition(new UE.Vector2D(rx, wvY));
     browser.LoadURL(URL);
+
+    // ③ 镂空试验：网页放最底层 + UE 视图挖洞（maskView），看网页能否透过洞显示
+    // 不用 CAShapeLayer+CGPath（要传裸指针，桥不支持）；改用 UIView.maskView：
+    // mask 用真 UIView，backgroundColor 要 UIColor（对象），4 个子视图围出中间的洞
+    makeBtn('镂空试验', vx * 0.05, vy * 0.52, vx * 0.28, 60, function () {
+        try {
+            const W = vp.X, H = vp.Y;                       // 原生坐标（点）
+            const hx = rx / DS, hy = wvY / DS, hw = rw / DS, hh2 = wvH / DS;
+
+            const app = invoke('UIApplication', 'sharedApplication', []);
+            const win = invoke('#' + app, 'keyWindow', []);
+            const subs = invoke('#' + win, 'subviews', []);
+            const ue  = invoke('#' + subs, 'objectAtIndex:', [0]);
+            log('UE 视图: ' + invoke('#' + ue, 'description', []));
+
+            // 1) 网页放最底层
+            const nsurl = invoke('NSURL', 'URLWithString:', [URL]);
+            const req   = invoke('NSURLRequest', 'requestWithURL:', [h(nsurl)]);
+            const wv = invoke('#' + invoke('WKWebView', 'alloc', []),
+                'initWithFrame:', [{ t: 'st', v: [hx, hy, hw, hh2] }]);
+            invoke('#' + wv, 'loadRequest:', [h(req)]);
+            invoke('#' + win, 'addSubview:', [h(wv)]);
+            invoke('#' + win, 'sendSubviewToBack:', [h(wv)]);
+
+            // 2) 挖洞：整块透明 mask + 4 块不透明白底围出中间的洞
+            const mask = invoke('#' + invoke('UIView', 'alloc', []),
+                'initWithFrame:', [{ t: 'st', v: [0, 0, W, H] }]);
+            invoke('#' + mask, 'setBackgroundColor:', [h(invoke('UIColor', 'clearColor', []))]);
+            const white = invoke('UIColor', 'whiteColor', []);
+            const rects = [
+                [0, 0, W, hy],                               // 上
+                [0, hy + hh2, W, H - hy - hh2],              // 下
+                [0, hy, hx, hh2],                            // 左
+                [hx + hw, hy, W - hx - hw, hh2]              // 右
+            ];
+            for (const r of rects) {
+                const v = invoke('#' + invoke('UIView', 'alloc', []),
+                    'initWithFrame:', [{ t: 'st', v: r }]);
+                invoke('#' + v, 'setBackgroundColor:', [h(white)]);
+                invoke('#' + mask, 'addSubview:', [h(v)]);
+            }
+            invoke('#' + ue, 'setMaskView:', [h(mask)]);
+            show('镂空已设置：网页在最底层，UE 挖了洞。看右下角有没有网页显示出来');
+        } catch (e) {
+            show('镂空失败: ' + e, false);
+        }
+    }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
 
     // 关闭按钮
     makeBtn('✕', vx - 84, 20, 64, 64, function () { w.RemoveFromViewport(); },
