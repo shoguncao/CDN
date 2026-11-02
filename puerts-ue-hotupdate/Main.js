@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.7.0';
+const VERSION = '4.7.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -204,22 +204,47 @@ try {
             const cLoc = cam.GetCameraLocation();
             const cRot = cam.GetCameraRotation();
             const fwd  = UE.KismetMathLibrary.GetForwardVector(cRot);
-            const dist = 300;
+
+            // World 空间面片的世界尺寸 = DrawSize 的数值（WidgetComponent.cpp:819
+            // BoxExtent = (1, DrawSize.X/2, DrawSize.Y/2)，单位 cm），
+            // 所以按相机 FOV 反算距离，让 720 的高度刚好铺满垂直视野
+            const DW = 1280, DH = 720;
+            const fovH = cam.GetFOVAngle();                       // 水平 FOV（度）
+            const aspect = vp.X / vp.Y;
+            const tanV = Math.tan(fovH * Math.PI / 360) / aspect; // tan(垂直 FOV / 2)
+            const dist = (DH / 2) / tanV;
             const wLoc = new UE.Vector(cLoc.X + fwd.X * dist, cLoc.Y + fwd.Y * dist, cLoc.Z + fwd.Z * dist);
 
             const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
             const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
             comp.SetWidget(w);
             comp.SetWidgetSpace(UE.EWidgetSpace.World);    // ← World 才建虚拟窗口（纹理模式）
-            comp.SetDrawSize(new UE.Vector2D(1280, 720));
+            comp.SetDrawSize(new UE.Vector2D(DW, DH));
             comp.SetTwoSided(true);                        // 双面，避免背对相机看不见
             comp.SetWorldLocation(wLoc);
-            comp.SetWorldRotation(UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc));
+            comp.SetWorldRotation(UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc));   // 法线朝相机
             comp.RegisterComponent();
 
-            log('纹理模式已设置：位置=' + JSON.stringify([wLoc.X, wLoc.Y, wLoc.Z]) +
-                ' DrawSize=1280x720');
-            show('已切 World 空间 WidgetComponent。看网页是否出现在 3D 场景里、UMG 能否盖住它');
+            log('纹理模式已设置：距离=' + Math.round(dist) + 'cm，DrawSize=' + DW + 'x' + DH);
+
+            // 硬证据：纹理模式下 UE 会把那个原生 WKWebView 隐藏，
+            // 这里切完 1.5 秒后遍历 window 的 subviews，打印每个视图的 hidden 状态
+            setTimeout(function () {
+                try {
+                    const app2 = invoke('UIApplication', 'sharedApplication', []);
+                    const del2 = invoke('#' + app2, 'delegate', []);
+                    const win2 = del2 ? invoke('#' + del2, 'window', []) : invoke('#' + app2, 'keyWindow', []);
+                    const arr  = invoke('#' + win2, 'subviews', []);
+                    const n    = invoke('#' + arr, 'count', []);
+                    for (let i = 0; i < n; i++) {
+                        const v = invoke('#' + arr, 'objectAtIndex:', [i]);
+                        log('子视图' + i + ' hidden=' + invoke('#' + v, 'isHidden', []) +
+                            ' ' + invoke('#' + v, 'description', []));
+                    }
+                } catch (e) { log('检查子视图失败: ' + e); }
+            }, 1500);
+
+            show('已切 World 空间（距离 ' + Math.round(dist) + 'cm）。看 3D 场景里有没有网页面片');
         } catch (e) { show('切换失败: ' + e, false); }
     }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
 
