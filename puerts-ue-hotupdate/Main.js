@@ -1,5 +1,5 @@
-// Main.js 5.4.3 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.3';
+// Main.js 5.4.4 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.4';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -128,13 +128,17 @@ try {
             Math.round(wLoc.Y) + ',' + Math.round(wLoc.Z));
         log('诊断: visible=' + sVis + ' rt=' + sRt + ' widget=' + sW);
 
-        // 轮询看 rt 会不会变成"有"（1 秒 / 3 秒各打一次）
-        let n = 0;
+        // 轮询：rt 一旦有内容就贴到中间那块图片上（这一步才是"看 RT 里有没有网页"）
+        let n = 0, applied = false;
         const t = setInterval(function () {
             n++;
-            if (n === 1 || n === 3) {
-                log(n + ' 秒后 rt=' + (comp.GetRenderTarget() ? '有' : 'null'));
+            const r = comp.GetRenderTarget();
+            if (r && !applied) {
+                applied = true;
+                img.SetBrushResourceObject(r);
+                log('已把组件纹理贴到中间图片（看里面有没有网页）');
             }
+            if (n === 1 || n === 3) { log(n + ' 秒后 rt=' + (r ? '有' : 'null')); }
             if (n >= 3) { clearInterval(t); }
         }, 1000);
     } catch (e) {
