@@ -1,5 +1,5 @@
-// Main.js 5.4.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.1';
+// Main.js 5.4.2 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -100,14 +100,20 @@ try {
         const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
         comp.SetWidgetSpace(UE.EWidgetSpace.World);          // World 才建虚拟窗口
         comp.SetDrawSize(new UE.Vector2D(DW, DH));
+        comp.SetTwoSided(true);                                 // 双面：排除朝向反了被剔除的情况
         comp.RegisterComponent();
         try { comp.SetTickWhenOffscreen(true); } catch (e) { log('SetTickWhenOffscreen 失败: ' + e); }
         comp.SetWidget(w2);
         comp.K2_SetWorldLocationAndRotation(wLoc,
             UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc), false, new UE.HitResult(), false);
-        const ds = comp.GetCurrentDrawSize();
-        log('组件已建 前方=' + Math.round(dist) + 'cm DrawSize=' + ds.X + 'x' + ds.Y +
-            ' 位置=' + Math.round(wLoc.X) + ',' + Math.round(wLoc.Y) + ',' + Math.round(wLoc.Z));
+        // 诊断：区分「面片画了但朝向反了」还是「组件压根没在画」
+        let sVis = '?', sRt = '?', sW = '?';
+        try { sVis = comp.IsVisible(); } catch (e) { }
+        try { sRt  = comp.GetRenderTarget() ? '有' : 'null'; } catch (e) { }
+        try { sW   = comp.GetWidget()      ? '有' : 'null'; } catch (e) { }
+        log('组件已建 前方=' + Math.round(dist) + 'cm 位置=' + Math.round(wLoc.X) + ',' +
+            Math.round(wLoc.Y) + ',' + Math.round(wLoc.Z));
+        log('诊断: visible=' + sVis + ' rt=' + sRt + ' widget=' + sW);
     } catch (e) {
         log('建 WidgetComponent 失败: ' + e);
     }
