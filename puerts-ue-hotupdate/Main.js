@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.7.4';
+const VERSION = '4.8.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -95,6 +95,18 @@ try {
     // 右半区：底部网页，网页上方一个按钮
     const rx = vx * 0.35, rw = vx * 0.60;
     const wvY = vy * 0.55, wvH = vy * 0.38;
+
+    // ---- widget B：只装一个 WebBrowser，**从不 AddToViewport** ----
+    // 原因：SWebBrowserView 只在首次绘制时缓存父窗口（SWebBrowserView.cpp:233），
+    // 一旦在真实窗口里画过，后面再塞进 WidgetComponent 也不会重新判断 → 永远是原生模式。
+    // 所以 B 从创建起就不进 viewport，只在"纹理模式"里作为组件内容被首次绘制。
+    const w2 = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
+    const canvas2 = w2.WidgetTree.RootWidget;
+    const browser2 = UE.NewObject(UE.WebBrowser.StaticClass(), w2.WidgetTree);
+    const b2Slot = canvas2.AddChild(browser2);
+    b2Slot.SetSize(new UE.Vector2D(vx, vy));
+    b2Slot.SetPosition(new UE.Vector2D(0, 0));
+    browser2.LoadURL(URL);
 
     // ① 左边：只有一个按钮
     makeBtn('加载 www.qq.com', vx * 0.05, vy * 0.42, vx * 0.28, 60, function () {
@@ -191,41 +203,38 @@ try {
         }
     }, new UE.LinearColor(0.5, 0.2, 0.6, 1));
 
-    // ④ 纹理模式：把 widget 交给 WidgetComponent，且必须是 World（3D）空间
-    // 关键：只有 Space != Screen 才会创建 SVirtualWindow（WidgetComponent.cpp:1631），
-    // Screen 空间走的是另一条渲染路径、不会触发纹理模式。
-    // RegisterComponent() 自己会把组件加进 Outer Actor 的组件数组（ActorComponent.h:913），
-    // 所以不需要 AddInstanceComponent（那个不是蓝图接口，JS 也调不到）。
+    // ④ 纹理模式：把「只装网页的 widget B」交给 WidgetComponent（World 空间）
+    // 两个关键点（都来自源码）：
+    //  1) 只有 Space != Screen 才创建 SVirtualWindow（WidgetComponent.cpp:1631）
+    //  2) SWebBrowserView 只在**首次绘制**时缓存父窗口（SWebBrowserView.cpp:233），
+    //     所以 widget 一旦在真实窗口里画过，就再也切不到纹理模式了
+    //     → 所以 B 必须从创建起就一直不进 viewport
     makeBtn('纹理·WidgetComponent', vx * 0.05, vy * 0.62, vx * 0.28, 46, function () {
         try {
-            w.RemoveFromViewport();                        // ParentWindow 只缓存一次，必须先摘掉
-
             const cam  = UE.GameplayStatics.GetPlayerCameraManager(world, 0);
             const cLoc = cam.GetCameraLocation();
             const cRot = cam.GetCameraRotation();
             const fwd  = UE.KismetMathLibrary.GetForwardVector(cRot);
 
-            // World 空间面片的世界尺寸 = DrawSize 的数值（WidgetComponent.cpp:819
-            // BoxExtent = (1, DrawSize.X/2, DrawSize.Y/2)，单位 cm），
-            // 所以按相机 FOV 反算距离，让 720 的高度刚好铺满垂直视野
+            // World 空间面片的世界尺寸 = DrawSize 数值（WidgetComponent.cpp:819，单位 cm）
+            // 按相机 FOV 反算距离，让 720 的高度刚好铺满垂直视野
             const DW = 1280, DH = 720;
-            const fovH = cam.GetFOVAngle();                       // 水平 FOV（度）
+            const fovH = cam.GetFOVAngle();
             const aspect = vp.X / vp.Y;
-            const tanV = Math.tan(fovH * Math.PI / 360) / aspect; // tan(垂直 FOV / 2)
+            const tanV = Math.tan(fovH * Math.PI / 360) / aspect;
             const dist = (DH / 2) / tanV;
             const wLoc = new UE.Vector(cLoc.X + fwd.X * dist, cLoc.Y + fwd.Y * dist, cLoc.Z + fwd.Z * dist);
 
             const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
             const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
-            comp.SetWidgetSpace(UE.EWidgetSpace.World);    // ← World 才建虚拟窗口（纹理模式）
-            comp.SetWidget(w);
+            comp.SetWidgetSpace(UE.EWidgetSpace.World);    // ← World 才建虚拟窗口
+            comp.SetWidget(w2);                            // w2 从没进过 viewport
             comp.SetDrawSize(new UE.Vector2D(DW, DH));
-            comp.SetTwoSided(true);                        // 双面，避免背对相机看不见
-            comp.RegisterComponent();                      // 先注册（这一步才会建虚拟窗口）
+            comp.SetTwoSided(true);
+            comp.RegisterComponent();
 
-            // 摆放：反射里的名字是 K2_SetWorldLocation（SceneComponent.h:495），
-            // 第 3 个参数是 FHitResult&，必须传一个实例（bSweep=false 时不会用到内容）
-            const wRot = UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc);   // 法线朝相机
+            // 反射名是 K2_SetWorldLocation（SceneComponent.h:495），第 3 参是 FHitResult&
+            const wRot = UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc);
             let placed = false;
             const tries = [
                 ['K2_SetWorldLocationAndRotation', function () {
@@ -238,7 +247,7 @@ try {
                 try { t[1](); placed = true; log('摆放成功: ' + t[0]); break; }
                 catch (e) { log('摆放失败 ' + t[0] + ': ' + e); }
             }
-            if (!placed) { log('⚠ 组件已注册但没摆好位置，可能看不见'); }
+            if (!placed) { log('⚠ 组件已注册但没摆好位置'); }
 
             log('纹理模式已设置：距离=' + Math.round(dist) + 'cm，DrawSize=' + DW + 'x' + DH);
 
@@ -248,7 +257,7 @@ try {
             setTimeout(function () {
                 let n = 0;
                 function dump(v, depth) {
-                    if (depth > 5 || n > 24) { return; }
+                    if (depth > 8 || n > 40) { return; }
                     n++;
                     let desc = '';
                     try { desc = String(invoke('#' + v, 'description', [])); } catch (e) { }
@@ -261,7 +270,7 @@ try {
                         subs = invoke('#' + v, 'subviews', []);
                         cnt  = invoke('#' + subs, 'count', []);
                     } catch (e) { return; }
-                    for (let i = 0; i < cnt && i < 6; i++) {
+                    for (let i = 0; i < cnt && i < 8; i++) {
                         dump(invoke('#' + subs, 'objectAtIndex:', [i]), depth + 1);
                     }
                 }
