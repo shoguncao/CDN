@@ -1,5 +1,5 @@
-// Main.js 5.2.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.2.1';
+// Main.js 5.3.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.3.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -61,14 +61,48 @@ try {
             new UE.LinearColor(1 - k, k, 0, 1));
     }, Math.round(1000 / FPS));
 
-    // ① 展示网页：它大部分在屏幕外，只在右边露 120 像素 —— 用来确认"确实加载出来了"
-    //    （UE 的 WebBrowser 底层是原生 WKWebView，放在视口外它也不会显示，露一点便于确认）
-    const browser = UE.NewObject(UE.WebBrowser.StaticClass(), w.WidgetTree);
-    const bSlot   = canvas.AddChild(browser);
-    bSlot.SetSize(new UE.Vector2D(vx * 0.70, vy * 0.70));
-    bSlot.SetPosition(new UE.Vector2D(vx - 120, vy * 0.20));   // 右边露 120 像素
-    browser.LoadURL('https://www.qq.com');
-    log('网页已加载（右边露出 120 像素）');
+    // ① 展示网页：不直接加到 UMG 画布，而是交给 WidgetComponent（World 空间 → 虚拟窗口）
+    //    World 空间下组件会建 SVirtualWindow（WidgetComponent.cpp:1631），把网页承载的那棵
+    //    控件树画进一张渲染目标 → 以 3D 面片的形式显示在场景里（同时也就有 RT 可取纹理）。
+    //    注意：承载网页的 widget 从头到尾不 AddToViewport，否则浏览器会把父窗口
+    //    缓存成"真实窗口"（SWebBrowserView.cpp:233 只记录一次），就再也进不了纹理模式。
+    try {
+        const w2  = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
+        const wt2 = w2.WidgetTree;
+        let root2 = wt2.RootWidget;
+        if (!root2) {                       // 未进 viewport 的 widget，根节点还没建
+            root2 = UE.NewObject(UE.CanvasPanel.StaticClass(), wt2);
+            wt2.RootWidget = root2;
+        }
+        const b2 = UE.NewObject(UE.WebBrowser.StaticClass(), wt2);
+        const s2 = root2.AddChild(b2);
+        s2.SetSize(new UE.Vector2D(1280, 720));
+        s2.SetPosition(new UE.Vector2D(0, 0));
+        b2.LoadURL('https://www.qq.com');
+
+        // 摆到相机正前方（World 空间的面片要摆好位置才看得见）
+        const cam  = UE.GameplayStatics.GetPlayerCameraManager(world, 0);
+        const cLoc = cam.GetCameraLocation();
+        const fwd  = UE.KismetMathLibrary.GetForwardVector(cam.GetCameraRotation());
+        const DW = 1280, DH = 720;
+        const tanV = Math.tan(cam.GetFOVAngle() * Math.PI / 360) / (vp.X / vp.Y);
+        const dist = (DH / 2) / tanV;                       // 让面片高度铺满垂直视野
+        const wLoc = new UE.Vector(cLoc.X + fwd.X * dist, cLoc.Y + fwd.Y * dist, cLoc.Z + fwd.Z * dist);
+
+        const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
+        const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
+        comp.SetWidgetSpace(UE.EWidgetSpace.World);          // World 才建虚拟窗口
+        comp.SetDrawSize(new UE.Vector2D(DW, DH));
+        comp.RegisterComponent();
+        try { comp.SetTickWhenOffscreen(true); } catch (e) { log('SetTickWhenOffscreen 失败: ' + e); }
+        comp.SetWidget(w2);
+        comp.K2_SetWorldLocationAndRotation(wLoc,
+            UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc), false, new UE.HitResult(), false);
+
+        log('网页已交给 WidgetComponent（World 空间，相机前方 ' + Math.round(dist) + 'cm）');
+    } catch (e) {
+        log('建 WidgetComponent 失败: ' + e);
+    }
 
     // 关闭按钮：容器右上角外侧
     const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
