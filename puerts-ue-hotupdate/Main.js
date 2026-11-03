@@ -46,6 +46,21 @@ try {
     iSlot.SetPosition(new UE.Vector2D(p.X + 2.5, p.Y + 2.5));
     img.SetBrushResourceObject(rt);
 
+    // 30fps 更新纹理，颜色在 10 秒内 红→绿→红 渐变一次
+    //   帧率 30fps → 每 1000/30 ≈ 33ms 一帧；周期 10s → 300 帧走完一个来回
+    //   t   = 帧号 / 30                       （秒）
+    //   s   = 0.5 * (1 - cos(2π·t / 10))      （0→1→0，余弦缓动比线性三角波平滑）
+    //   颜色 = (1-s, s, 0, 1)                 （s=0 红，s=1 绿）
+    const FPS = 30, PERIOD = 10;
+    let tick = 0;
+    setInterval(function () {
+        tick++;
+        const t = tick / FPS;
+        const k = 0.5 * (1 - Math.cos(2 * Math.PI * t / PERIOD));
+        UE.KismetRenderingLibrary.ClearRenderTarget2D(world, rt,
+            new UE.LinearColor(1 - k, k, 0, 1));
+    }, Math.round(1000 / FPS));
+
     // 关闭按钮：容器右上角外侧
     const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
     btn.SetBackgroundColor(new UE.LinearColor(0.9, 0.2, 0.2, 1));
