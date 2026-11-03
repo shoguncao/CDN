@@ -1,5 +1,5 @@
-// Main.js 5.4.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.0';
+// Main.js 5.4.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -74,6 +74,13 @@ try {
             root2 = UE.NewObject(UE.CanvasPanel.StaticClass(), wt2);
             wt2.RootWidget = root2;
         }
+        // 先垫一层亮红底（在网页之下）：如果 3D 面片画出来了，屏幕上会看到这块红
+        const bg2 = UE.NewObject(UE.Image.StaticClass(), wt2);
+        bg2.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 1));
+        const bg2s = root2.AddChild(bg2);
+        bg2s.SetSize(new UE.Vector2D(1280, 720));
+        bg2s.SetPosition(new UE.Vector2D(0, 0));
+
         const b2 = UE.NewObject(UE.WebBrowser.StaticClass(), wt2);
         const s2 = root2.AddChild(b2);
         s2.SetSize(new UE.Vector2D(1280, 720));
@@ -98,23 +105,9 @@ try {
         comp.SetWidget(w2);
         comp.K2_SetWorldLocationAndRotation(wLoc,
             UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc), false, new UE.HitResult(), false);
-        log('网页已交给 WidgetComponent（World 空间，相机前方 ' + Math.round(dist) + 'cm）');
-
-        // ② 取纹理：GetRenderTarget() 是 UFUNCTION（WidgetComponent.h:187）
-        //    渲染目标要等组件画过第一帧才存在，所以每 500ms 试一次，拿到就停
-        let tries = 0;
-        const timer = setInterval(function () {
-            tries++;
-            const rt2 = comp.GetRenderTarget();
-            if (rt2) {
-                clearInterval(timer);
-                log('② 取到纹理 ✓ 对象=' + UE.KismetSystemLibrary.GetObjectName(rt2));
-                img.SetBrushResourceObject(rt2);      // 把中间那块图片换成组件纹理
-            } else if (tries >= 10) {
-                clearInterval(timer);
-                log('② 试了 10 次仍拿不到纹理 ✗');
-            }
-        }, 500);
+        const ds = comp.GetCurrentDrawSize();
+        log('组件已建 前方=' + Math.round(dist) + 'cm DrawSize=' + ds.X + 'x' + ds.Y +
+            ' 位置=' + Math.round(wLoc.X) + ',' + Math.round(wLoc.Y) + ',' + Math.round(wLoc.Z));
     } catch (e) {
         log('建 WidgetComponent 失败: ' + e);
     }
