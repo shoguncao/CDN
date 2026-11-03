@@ -1,5 +1,5 @@
-// Main.js 5.0.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.0.0';
+// Main.js 5.0.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.0.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -39,8 +39,9 @@ try {
     bSlot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
     browser.LoadURL('https://www.qq.com');
 
-    // 关闭按钮：必须放在网页矩形之外，
-    // 否则会被 UE 的原生 WebView（它压在所有 UE 内容之上）盖住，看不见也点不到
+    // 关闭按钮：故意横跨容器上边沿——上半露在网页外，下半被网页盖住，
+    // 用它可以直观看到"原生 WebView 压在所有 UE 内容之上"这一事实
+    // （要能点到，就得放在网页矩形之外）
     const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
     btn.SetBackgroundColor(new UE.LinearColor(0.9, 0.2, 0.2, 1));
     const txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
@@ -48,7 +49,7 @@ try {
     btn.AddChild(txt);
     const btnSlot = canvas.AddChild(btn);
     btnSlot.SetSize(new UE.Vector2D(64, 64));
-    btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 64));
+    btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 32));   // 一半在网页外，一半被盖住
     btn.OnClicked.Add(function () { w.RemoveFromViewport(); });
 
     log('网页页面已建 版本 ' + VERSION);
