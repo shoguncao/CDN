@@ -1,5 +1,5 @@
-// Main.js 5.2.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.2.0';
+// Main.js 5.2.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.2.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -61,14 +61,14 @@ try {
             new UE.LinearColor(1 - k, k, 0, 1));
     }, Math.round(1000 / FPS));
 
-    // ① 展示网页：它大部分在屏幕外，只在右边露 20 像素 —— 用来确认"确实加载出来了"
+    // ① 展示网页：它大部分在屏幕外，只在右边露 120 像素 —— 用来确认"确实加载出来了"
     //    （UE 的 WebBrowser 底层是原生 WKWebView，放在视口外它也不会显示，露一点便于确认）
     const browser = UE.NewObject(UE.WebBrowser.StaticClass(), w.WidgetTree);
     const bSlot   = canvas.AddChild(browser);
     bSlot.SetSize(new UE.Vector2D(vx * 0.70, vy * 0.70));
-    bSlot.SetPosition(new UE.Vector2D(vx - 20, vy * 0.20));
+    bSlot.SetPosition(new UE.Vector2D(vx - 120, vy * 0.20));   // 右边露 120 像素
     browser.LoadURL('https://www.qq.com');
-    log('网页已加载（右边露出 20 像素）');
+    log('网页已加载（右边露出 120 像素）');
 
     // 关闭按钮：容器右上角外侧
     const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
