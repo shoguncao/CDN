@@ -1,5 +1,5 @@
-// Main.js 5.3.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.3.0';
+// Main.js 5.4.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -98,8 +98,23 @@ try {
         comp.SetWidget(w2);
         comp.K2_SetWorldLocationAndRotation(wLoc,
             UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc), false, new UE.HitResult(), false);
-
         log('网页已交给 WidgetComponent（World 空间，相机前方 ' + Math.round(dist) + 'cm）');
+
+        // ② 取纹理：GetRenderTarget() 是 UFUNCTION（WidgetComponent.h:187）
+        //    渲染目标要等组件画过第一帧才存在，所以每 500ms 试一次，拿到就停
+        let tries = 0;
+        const timer = setInterval(function () {
+            tries++;
+            const rt2 = comp.GetRenderTarget();
+            if (rt2) {
+                clearInterval(timer);
+                log('② 取到纹理 ✓ 对象=' + UE.KismetSystemLibrary.GetObjectName(rt2));
+                img.SetBrushResourceObject(rt2);      // 把中间那块图片换成组件纹理
+            } else if (tries >= 10) {
+                clearInterval(timer);
+                log('② 试了 10 次仍拿不到纹理 ✗');
+            }
+        }, 500);
     } catch (e) {
         log('建 WidgetComponent 失败: ' + e);
     }
