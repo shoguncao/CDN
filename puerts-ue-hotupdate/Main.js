@@ -1,5 +1,5 @@
-// Main.js 5.4.2 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.2';
+// Main.js 5.4.3 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.3';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -103,6 +103,19 @@ try {
         comp.SetTwoSided(true);                                 // 双面：排除朝向反了被剔除的情况
         comp.RegisterComponent();
         try { comp.SetTickWhenOffscreen(true); } catch (e) { log('SetTickWhenOffscreen 失败: ' + e); }
+
+        // 上一步诊断出 rt=null（组件没在画）→ 组件是运行时手工注册的，
+        // BeginPlay 里那句 SetComponentTickEnabled 可能没走到，这里手动启用 Tick
+        const okList = [];
+        function tryCall(name, fn) {
+            try { fn(); okList.push(name); } catch (e) { okList.push(name + '✗'); }
+        }
+        tryCall('TickEnabled',      function () { comp.SetComponentTickEnabled(true); });
+        tryCall('TickMode',         function () { comp.SetTickMode(UE.ETickMode.Enabled); });
+        tryCall('Activate',         function () { comp.Activate(true); });
+        tryCall('RequestRenderUpd', function () { comp.RequestRenderUpdate(); });
+        log('启用结果: ' + okList.join(' '));
+
         comp.SetWidget(w2);
         comp.K2_SetWorldLocationAndRotation(wLoc,
             UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc), false, new UE.HitResult(), false);
@@ -114,6 +127,16 @@ try {
         log('组件已建 前方=' + Math.round(dist) + 'cm 位置=' + Math.round(wLoc.X) + ',' +
             Math.round(wLoc.Y) + ',' + Math.round(wLoc.Z));
         log('诊断: visible=' + sVis + ' rt=' + sRt + ' widget=' + sW);
+
+        // 轮询看 rt 会不会变成"有"（1 秒 / 3 秒各打一次）
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            if (n === 1 || n === 3) {
+                log(n + ' 秒后 rt=' + (comp.GetRenderTarget() ? '有' : 'null'));
+            }
+            if (n >= 3) { clearInterval(t); }
+        }, 1000);
     } catch (e) {
         log('建 WidgetComponent 失败: ' + e);
     }
