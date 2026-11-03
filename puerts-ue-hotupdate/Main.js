@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.7.3';
+const VERSION = '4.7.4';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -246,32 +246,32 @@ try {
             // 递归遍历视图树找 WKWebView（它不一定是 window 的直接子视图），
             // 打印它的 hidden —— hidden=1 就是纹理模式生效
             setTimeout(function () {
-                let found = 0;
-                function walk(v, depth) {
-                    if (depth > 4) { return; }
-                    let isWV = 0;
-                    try { isWV = invoke('#' + v, 'isKindOfClass:', [{ t: 's', v: 'WKWebView' }]); } catch (e) { }
-                    if (isWV) {
-                        found++;
-                        log('★ 找到 WKWebView hidden=' + invoke('#' + v, 'isHidden', []) +
-                            ' frame=' + JSON.stringify(invoke('#' + v, 'frame', [])) +
-                            ' 层级' + depth);
-                    }
-                    let subs = null, n = 0;
+                let n = 0;
+                function dump(v, depth) {
+                    if (depth > 5 || n > 24) { return; }
+                    n++;
+                    let desc = '';
+                    try { desc = String(invoke('#' + v, 'description', [])); } catch (e) { }
+                    if (desc.length > 62) { desc = desc.substring(0, 62); }
+                    let hid = '?';
+                    try { hid = invoke('#' + v, 'isHidden', []); } catch (e) { }
+                    log('[' + depth + ']h=' + hid + ' ' + desc);
+                    let subs = null, cnt = 0;
                     try {
                         subs = invoke('#' + v, 'subviews', []);
-                        n = invoke('#' + subs, 'count', []);
+                        cnt  = invoke('#' + subs, 'count', []);
                     } catch (e) { return; }
-                    for (let i = 0; i < n; i++) {
-                        walk(invoke('#' + subs, 'objectAtIndex:', [i]), depth + 1);
+                    for (let i = 0; i < cnt && i < 6; i++) {
+                        dump(invoke('#' + subs, 'objectAtIndex:', [i]), depth + 1);
                     }
                 }
                 try {
                     const app2 = invoke('UIApplication', 'sharedApplication', []);
                     const del2 = invoke('#' + app2, 'delegate', []);
                     const win2 = del2 ? invoke('#' + del2, 'window', []) : invoke('#' + app2, 'keyWindow', []);
-                    walk(win2, 0);
-                    if (!found) { log('没找到 WKWebView（可能已被移除）'); }
+                    log('=== 视图树开始（win=' + win2 + '）===');
+                    dump(win2, 0);
+                    log('=== 视图树结束，共 ' + n + ' 个 ===');
                 } catch (e) { log('检查视图树失败: ' + e); }
             }, 1500);
 
