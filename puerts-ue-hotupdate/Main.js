@@ -1,5 +1,5 @@
-// Main.js 5.0.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.0.1';
+// Main.js 5.1.0 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.1.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -31,17 +31,22 @@ try {
     bgSlot.SetSize(s);
     bgSlot.SetPosition(p);
 
-    // 网页：比容器小一圈，露出容器边框
-    const browser = UE.NewObject(UE.WebBrowser.StaticClass(), w.WidgetTree);
-    const bSlot = canvas.AddChild(browser);
-    const m = 5;
-    bSlot.SetSize(new UE.Vector2D(s.X - m, s.Y - m));
-    bSlot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
-    browser.LoadURL('https://www.qq.com');
+    // ---- 验证：Puerts 本身能渲染纹理吗（全 JS，未改 native）----
+    //   建一张渲染目标纹理（CreateRenderTarget2D 是 UFUNCTION）→ 填成红色
+    //   → 用 UImage 显示。用 SetBrushResourceObject（收 UObject*，能接
+    //     UTextureRenderTarget2D）；SetBrushFromTexture 只收 UTexture2D，接不了 RT
+    const rtW = 512, rtH = 288;
+    const rt  = UE.KismetRenderingLibrary.CreateRenderTarget2D(world, rtW, rtH);
+    UE.KismetRenderingLibrary.ClearRenderTarget2D(world, rt, new UE.LinearColor(1, 0.2, 0.2, 1));
+    log('纹理已建 rt=' + rt);
 
-    // 关闭按钮：故意横跨容器上边沿——上半露在网页外，下半被网页盖住，
-    // 用它可以直观看到"原生 WebView 压在所有 UE 内容之上"这一事实
-    // （要能点到，就得放在网页矩形之外）
+    const img = UE.NewObject(UE.Image.StaticClass(), w.WidgetTree);
+    const iSlot = canvas.AddChild(img);
+    iSlot.SetSize(new UE.Vector2D(s.X - 5, s.Y - 5));
+    iSlot.SetPosition(new UE.Vector2D(p.X + 2.5, p.Y + 2.5));
+    img.SetBrushResourceObject(rt);
+
+    // 关闭按钮：容器右上角外侧
     const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
     btn.SetBackgroundColor(new UE.LinearColor(0.9, 0.2, 0.2, 1));
     const txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
@@ -49,10 +54,10 @@ try {
     btn.AddChild(txt);
     const btnSlot = canvas.AddChild(btn);
     btnSlot.SetSize(new UE.Vector2D(64, 64));
-    btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 32));   // 一半在网页外，一半被盖住
+    btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 32));
     btn.OnClicked.Add(function () { w.RemoveFromViewport(); });
 
-    log('网页页面已建 版本 ' + VERSION);
+    log('纹理验证页已建 版本 ' + VERSION);
 } catch (e) {
     log('错误: ' + e);
 }
