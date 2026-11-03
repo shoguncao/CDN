@@ -1,7 +1,7 @@
 // Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.8.0';
+const VERSION = '4.8.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -101,12 +101,20 @@ try {
     // 一旦在真实窗口里画过，后面再塞进 WidgetComponent 也不会重新判断 → 永远是原生模式。
     // 所以 B 从创建起就不进 viewport，只在"纹理模式"里作为组件内容被首次绘制。
     const w2 = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
-    const canvas2 = w2.WidgetTree.RootWidget;
-    const browser2 = UE.NewObject(UE.WebBrowser.StaticClass(), w2.WidgetTree);
+    const wt2 = w2.WidgetTree;
+    // 没 AddToViewport 的 widget，WidgetTree.RootWidget 还是 null（根节点要等 Slate 构建时才生成），
+    // 所以自己造一个 CanvasPanel 当根节点直接赋给 WidgetTree
+    let canvas2 = wt2.RootWidget;
+    if (!canvas2) {
+        canvas2 = UE.NewObject(UE.CanvasPanel.StaticClass(), wt2);
+        wt2.RootWidget = canvas2;
+    }
+    const browser2 = UE.NewObject(UE.WebBrowser.StaticClass(), wt2);
     const b2Slot = canvas2.AddChild(browser2);
     b2Slot.SetSize(new UE.Vector2D(vx, vy));
     b2Slot.SetPosition(new UE.Vector2D(0, 0));
     browser2.LoadURL(URL);
+    log('widget B 已就绪（未加入 viewport），根节点=' + canvas2);
 
     // ① 左边：只有一个按钮
     makeBtn('加载 www.qq.com', vx * 0.05, vy * 0.42, vx * 0.28, 60, function () {
