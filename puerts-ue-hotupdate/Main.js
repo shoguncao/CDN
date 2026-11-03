@@ -1,9 +1,9 @@
-// Main.js 5.2.1 —— 容器(0.618) + 右上角关闭按钮 + 中间网页
+// Main.js 5.3.0 —— 容器(0.618) + 右上角关闭按钮 + 中间网页
 // 网页内容是**我们自己写的页面**（用 LoadString 塞 HTML，不需要另外部署）：
-//   下层 = iframe 里的外部网页（www.qq.com）
+//   下层 = iframe 里的外部网页（YouTube embed 播放器）
 //   上层 = 运营层（DOM，绝对定位盖在网页上，可点）
 //   点运营按钮 → 跳 myapp://xxx → 游戏用 OnUrlChanged 拦截
-const VERSION = '5.2.1';
+const VERSION = '5.3.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -15,10 +15,13 @@ function log(m) {
 // SetText 直接传 JS 字符串会被当指针解析而崩溃，必须先用 Conv_StringToText 转换
 function T(s) { return UE.KismetTextLibrary.Conv_StringToText(s); }
 
-// 我们自己的页面：iframe 嵌一个外部网页（这里是 qq.com），运营层盖在上面
+// 我们自己的页面：iframe 嵌一个外部网页，运营层盖在上面
 // 验证的机制：外部网页我们改不了，但只要**外层页面是我们自己的**，
 // 就能在它之上画运营层（可点），并通过 myapp:// 回传游戏
-const PAGE_URL = 'https://www.qq.com';
+// 注意：只有"允许被嵌"的站点才能用 iframe。qq.com 返回
+//   X-Frame-Options: SAMEORIGIN + Content-Security-Policy: frame-ancestors none → 必被拒（空白）
+// YouTube 的 embed 端点（/embed/视频ID）是官方给嵌的，可以。
+const PAGE_URL = 'https://www.youtube.com/embed/zQwni_cNV-Y?playsinline=1&rel=0&modestbranding=1';
 const HTML = [
     '<html><head><meta name="viewport" content="width=device-width,initial-scale=1">',
     '<style>',
@@ -29,7 +32,9 @@ const HTML = [
     '  #ops a{display:inline-block;margin:0 8px 0 0;padding:9px 14px;background:#ff5a5f;color:#fff;',
     '         border-radius:8px;text-decoration:none;font-size:15px}',
     '</style></head><body>',
-    '<iframe src="' + PAGE_URL + '"></iframe>',
+    '<iframe src="' + PAGE_URL + '" frameborder="0" playsinline',
+    '  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"',
+    '  allowfullscreen></iframe>',
     '<div id="ops">',
     '  <div class="title">运营层（盖在网页之上，可点）</div>',
     '  <a href="myapp://recharge?id=1">充值</a>',
