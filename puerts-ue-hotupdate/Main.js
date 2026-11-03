@@ -1,7 +1,7 @@
-// Main.js 4.6.0 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
+// Main.js 4.8.2 —— WebView 遮挡验证页（用 UE/Puerts 的 WebBrowser 控件，不是原生桥）
 // 布局：左边一个按钮；右边底部展示网页，网页上方一个按钮
 // 右下角还有一组"探针"（UMG 红块 + UMG 按钮），用来判定网页会不会遮住 UE 绘制的内容
-const VERSION = '4.8.1';
+const VERSION = '4.8.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -236,10 +236,25 @@ try {
             const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
             const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
             comp.SetWidgetSpace(UE.EWidgetSpace.World);    // ← World 才建虚拟窗口
-            comp.SetWidget(w2);                            // w2 从没进过 viewport
             comp.SetDrawSize(new UE.Vector2D(DW, DH));
             comp.SetTwoSided(true);
             comp.RegisterComponent();
+
+            // ShouldDrawWidget() 里：TickWhenOffscreen 为 false 时要求"最近 0.5s 内被渲染过"，
+            // 而新组件 GetLastRenderTime()==0 → 永远判为离屏 → 永不绘制（鸡生蛋）。
+            try { comp.SetTickWhenOffscreen(true); } catch (e) { log('SetTickWhenOffscreen 失败: ' + e); }
+            comp.SetComponentTickEnabled(true);
+            comp.SetWidget(w2);                            // 注册之后再设置，UpdateWidget 才会在已注册状态执行
+            try { comp.RequestRedraw(); } catch (e) { }
+
+            // 诊断：把组件状态打出来，失败时一眼看出卡在哪
+            try {
+                const ds = comp.GetDrawSize();
+                const cs = comp.GetCurrentDrawSize();
+                log('诊断: space=' + comp.GetWidgetSpace() +
+                    ' tickEnabled=' + comp.IsComponentTickEnabled() +
+                    ' drawSize=' + ds.X + 'x' + ds.Y + ' cur=' + cs.X + 'x' + cs.Y);
+            } catch (e) { log('诊断失败: ' + e); }
 
             // 反射名是 K2_SetWorldLocation（SceneComponent.h:495），第 3 参是 FHitResult&
             const wRot = UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc);
