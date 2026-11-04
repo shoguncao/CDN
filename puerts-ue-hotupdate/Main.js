@@ -1,5 +1,5 @@
-// Main.js 5.0.1 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.0.1';
+// Main.js 5.0.2 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.0.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -37,7 +37,7 @@ try {
     const m = 5;
     bSlot.SetSize(new UE.Vector2D(s.X - m, s.Y - m));
     bSlot.SetPosition(new UE.Vector2D(p.X + m / 2, p.Y + m / 2));
-    browser.LoadURL('https://www.qq.com');
+    browser.LoadURL('https://hk.keyso.uk/youtube-embed-api-demo.html?autoplay=1');
 
     // 关闭按钮：故意横跨容器上边沿——上半露在网页外，下半被网页盖住，
     // 用它可以直观看到"原生 WebView 压在所有 UE 内容之上"这一事实
