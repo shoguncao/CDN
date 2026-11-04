@@ -1,6 +1,6 @@
-// Main.js 5.7.1 —— maskView 挖洞方案：网页放最底层，游戏 Metal 层挖洞露出它
+// Main.js 5.7.2 —— maskView 挖洞方案：网页放最底层，游戏 Metal 层挖洞露出它
 // 关键取舍：洞内 UMG 一并被挖空（容器边框、右上角 ✕ 在洞外，仍可见可点）
-const VERSION = '5.7.1';
+const VERSION = '5.7.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -48,7 +48,7 @@ try {
     bgSlot.SetSize(s);
     bgSlot.SetPosition(p);
 
-    // 右上角关闭按钮（横跨容器上边沿：洞外部分可见，洞内部分会被 mask 一起挖掉）
+    // 右上角关闭按钮：mask 里给它「留岛」，整块恢复渲染，可盖在网页上
     const btn = UE.NewObject(UE.Button.StaticClass(), w.WidgetTree);
     btn.SetBackgroundColor(new UE.LinearColor(0.9, 0.2, 0.2, 1));
     const txt = UE.NewObject(UE.TextBlock.StaticClass(), w.WidgetTree);
@@ -128,6 +128,20 @@ try {
     block(ib[0], hy + hh, iw, ib[1] + ih - (hy + hh));                     // 下
     block(ib[0], hy, hx - ib[0], hh);                                      // 左
     block(hx + hw, hy, ib[0] + iw - (hx + hw), hh);                        // 右
+
+    // ---- ③b 关闭按钮「留岛」：把按钮那块也画成不透明，IOSView 恢复渲染 ----
+    // UMG 布局坐标 -> IOSView 屏幕点：同一个全屏在两套坐标系下的比例，
+    // k = IOSView.bounds / (vp * DS)。验证：p.X*k ≈ 洞 hx（差 gap）。
+    const BTN = 64;
+    const kx = iw / vx, ky = ih / vy;
+    const buX = p.X + s.X - BTN, buY = p.Y - 32;      // 按钮 UMG 左上角
+    const islandX = ib[0] + buX * kx;
+    const islandY = ib[1] + buY * ky;
+    const islandW = BTN * kx, islandH = BTN * ky;
+    block(islandX, islandY, islandW, islandH);         // 岛上 = UE 层可见 = 按钮压在网页上
+    log('按钮岛=' + [islandX, islandY, islandW, islandH].map(Math.round).join(',')
+        + ' k=' + kx.toFixed(3) + '/' + ky.toFixed(3));
+
     invoke('#' + iosView, 'setMaskView:', [h(maskV)]);
 
     log('maskView 已设 版本 ' + VERSION);
