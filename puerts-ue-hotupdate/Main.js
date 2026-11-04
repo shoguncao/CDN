@@ -1,6 +1,6 @@
-// Main.js 5.6.4 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.5 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.4';
+const VERSION = '5.6.5';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -88,23 +88,24 @@ try {
         log('建离屏网页失败: ' + e);
     }
 
-    // ② 纯 JS：WKWebView 快照 → PNG 文件 → ImportFileAsTexture2D → UMG
-    //   关键：UE 已经把 FImageUtils 包成 UFUNCTION（KismetRenderingLibrary.h:137），
-    //   ImportFileAsTexture2D 返回 UTexture2D*，Puerts 自动包装成 JS 能用的对象。
-    //   所以这一步完全不需要改 native。
-    let PNG = '', JPG = '', SAVED = '';
-    try {
-        const td = JSON.parse(B.CallCFunc('NSTemporaryDirectory', '@', '[]'));
-        PNG = td.v + 'wb_cap.png';
-        JPG = td.v + 'wb_cap.jpg';
-        SAVED = UE.KismetSystemLibrary.GetProjectSavedDirectory() + 'wb_cap.png';
-        log('PNG 路径=' + PNG);
-        log('SAVED 路径=' + SAVED);
-    } catch (e) {
-        log('取路径失败: ' + e);
-    }
-
+    // ② 纯 JS：WKWebView 快照 → PNG 字节（base64 中转）→ ImportBufferAsTexture2D → UMG
+    //   文件路线（ImportFileAsTexture2D）已确认 UE 读不进/读不出沙盒路径，
+    //   本轮彻底绕开文件系统，直接走 ImportBufferAsTexture2D（TArray<uint8> 版）。
+    //   这是终局判定：buffer 也 null → UE 的 Import*AsTexture2D 在 iOS 打包下不可用。
     let frames = 0, errLogged = false, lastSt = '';
+
+    function b64decode(s) {
+        const T = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        const out = new Uint8Array(Math.floor(s.length * 3 / 4));
+        let acc = 0, bits = 0, p = 0;
+        for (let i = 0; i < s.length; i++) {
+            const c = T.indexOf(s[i]);
+            if (c < 0) { continue; }                 // 跳过 = 和换行
+            acc = (acc << 6) | c; bits += 6;
+            if (bits >= 8) { bits -= 8; out[p++] = (acc >> bits) & 0xff; }
+        }
+        return out.subarray(0, p);
+    }
 
     // WKWebView 快照是异步 block 回调；桥会把参数编码成 JSON 数组字符串，
     // 用 Pump 取回（回调可能不在 JS 线程）
@@ -114,55 +115,30 @@ try {
             const uiImg = arr[0].v;                  // UIImage 句柄
             if (!uiImg) { if (lastSt !== 'empty') { log('快照为空'); lastSt = 'empty'; } return; }
 
-            // PNG 数据写两个位置：iOS 临时目录 / UE 自己的 Saved 目录
-            // （对照：UE 的 LoadFileToArray 能否读到沙盒 tmp 路径）
+            // UIImagePNGRepresentation(UIImage*) -> NSData*（UIKit C 函数）
             const r = JSON.parse(B.CallCFunc('UIImagePNGRepresentation', '@@',
                 JSON.stringify([{ t: 'h', v: uiImg }])));
             if (r.t === 'e' || !r.v) { log('PNG 转换失败: ' + r.v); return; }
-            invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
-            invoke('#' + r.v, 'writeToFile:atomically:', [SAVED, true]);
 
-            // 对照路线：JPEG（排除 PNG 解码环节）
-            let jpgOk = '';
-            try {
-                const j = JSON.parse(B.CallCFunc('UIImageJPEGRepresentation', '@@d',
-                    JSON.stringify([{ t: 'h', v: uiImg }, { t: 'd', v: 0.85 }])));
-                if (j.t !== 'e' && j.v) {
-                    invoke('#' + j.v, 'writeToFile:atomically:', [JPG, true]);
-                    jpgOk = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, JPG) ? 'OK' : 'null';
-                } else { jpgOk = 'convFail'; }
-            } catch (e2) { jpgOk = 'err:' + e2; }
+            // NSData -> base64 字符串 -> JS 本地解码成字节数组
+            const b64 = invoke('#' + r.v, 'base64EncodedStringWithOptions:', [0]);
+            const bin = b64decode(b64);
+            if (!bin.length) { if (lastSt !== 'b64empty') { log('base64 解码为空(串长' + b64.length + ')'); lastSt = 'b64empty'; } return; }
 
-            const texT = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
-            const texS = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, SAVED);
-            const st = 'tmp=' + (texT ? 'OK' : 'null') + ' saved=' + (texS ? 'OK' : 'null') + ' J=' + jpgOk;
+            // 塞进 UE 容器 → ImportBufferAsTexture2D
+            const uarr = UE.NewArray(UE.BuiltinByte);
+            for (let i = 0; i < bin.length; i++) { uarr.Add(bin[i]); }
+            const tex = UE.KismetRenderingLibrary.ImportBufferAsTexture2D(world, uarr);
+
+            const st = 'buffer=' + (tex ? 'OK' : 'null') + ' bytes=' + bin.length;
             if (st !== lastSt) { log(st); lastSt = st; }
-
-            const tex = texT || texS;
             if (tex) {
                 img.SetBrushFromTexture(tex);
                 frames++;
                 if (frames === 1) { log('★ 纯 JS 首帧纹理已显示（未改 native）'); }
-                return;
-            }
-
-            // 全部失败 → 2 秒后挖 UE 日志（延后保证屏幕能看到，不被刷掉）
-            if (!errLogged) {
+            } else if (!errLogged) {
                 errLogged = true;
-                setTimeout(function () {
-                    try {
-                        const logPath = UE.KismetSystemLibrary.GetProjectSavedDirectory() + 'Logs/PuertsUEDemo.log';
-                        const txt = invoke('NSString', 'stringWithContentsOfFile:encoding:error:',
-                            [logPath, 4, { t: 'n', v: 0 }]);
-                        if (typeof txt === 'string' && txt.length) {
-                            const hits = txt.split('\n')
-                                .filter(l => l.indexOf('LogImageUtils') >= 0 || l.indexOf('Error creating texture') >= 0 || l.indexOf('LogTexture') >= 0)
-                                .slice(-4).map(l => l.slice(-110));
-                            log('UE日志(' + hits.length + '):');
-                            hits.forEach(l => log(l));
-                        } else { log('读不到日志文件'); }
-                    } catch (e3) { log('读日志失败: ' + e3); }
-                }, 2000);
+                log('ImportBufferAsTexture2D 也 null → 与文件无关，在 UE 解码/建纹理层');
             }
         } catch (e) {
             if (!errLogged) { log('纯 JS 抓帧失败: ' + e); errLogged = true; }
@@ -172,12 +148,15 @@ try {
     setInterval(function () { B.Pump(); }, 100);
 
     setInterval(function () {
-        if (!wv || !PNG) { return; }
+        if (!wv) { return; }
         try {
+            // 快照宽度缩到 240（PNG 小，字节逐个 Add 才不慢）
+            const cfg = invoke('#' + invoke('WKSnapshotConfiguration', 'alloc', []), 'init', []);
+            try { invoke('#' + cfg, 'setSnapshotWidth:', [{ t: 'd', v: 240 }]); } catch (e2) { }
             // takeSnapshotWithConfiguration:completionHandler:
             // block 签名 v@?@@（返回 void，block 自身 @?，参数 UIImage* / NSError*）
             invoke('#' + wv, 'takeSnapshotWithConfiguration:completionHandler:',
-                [{ t: 'n', v: 0 }, { t: 'bl', sig: 'v@?@@', cb: 7 }]);
+                [h(cfg), { t: 'bl', sig: 'v@?@@', cb: 7 }]);
         } catch (e) {
             if (!errLogged) { log('takeSnapshot 失败: ' + e); errLogged = true; }
         }
