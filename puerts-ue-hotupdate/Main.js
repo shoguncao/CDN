@@ -1,5 +1,5 @@
-// Main.js 5.4.6 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.6';
+// Main.js 5.4.7 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.7';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -61,9 +61,10 @@ try {
             new UE.LinearColor(1 - k, k, 0, 1));
     }, Math.round(1000 / FPS));
 
-    // ① 最小验证：新建一个 widget，放一个 WebBrowser，摆在屏幕右侧外面、只露 100 像素
+    // ① 建 w2，放一个 WebBrowser，摆在屏幕右侧外面、只露 100 像素（已验证能显示）
+    let w2 = null;
     try {
-        const w2 = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
+        w2 = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
         w2.AddToViewport(0);
         const canvas2 = w2.WidgetTree.RootWidget;
         const b2 = UE.NewObject(UE.WebBrowser.StaticClass(), w2.WidgetTree);
@@ -72,8 +73,47 @@ try {
         s2.SetPosition(new UE.Vector2D(vx - 100, vy * 0.20));   // 右边露 100
         b2.LoadURL('https://www.qq.com');
         log('w2 网页已显示（右边露 100）根节点=' + (canvas2 ? '有' : 'null'));
+
+        // 顺带打印 UWebBrowser 上有没有取纹理接口（预期全是 undefined）
+        let probe = '';
+        for (const n of ['GetTexture', 'GetRenderTarget', 'GetViewportTexture']) {
+            probe += n + '=' + (typeof b2[n]) + ' ';
+        }
+        log('UWebBrowser 取纹理接口: ' + probe);
     } catch (e) {
         log('建 w2 网页失败: ' + e);
+    }
+
+    // ② 取「w2」的纹理：唯一接口是 UWidgetComponent::GetRenderTarget（WidgetComponent.h:187）
+    //    w2 本身没有这个接口，所以要把它交给 WidgetComponent，再取组件画的 RT。
+    //    注意：这需要先 w2.RemoveFromViewport()（一个 widget 不能同时属于 viewport 和组件），
+    //    所以右边那 100 像素的网页会消失。
+    try {
+        w2.RemoveFromViewport();
+        const comp = UE.NewObject(UE.WidgetComponent.StaticClass(),
+            UE.GameplayStatics.GetPlayerPawn(world, 0));
+        comp.SetWidgetSpace(UE.EWidgetSpace.World);
+        comp.SetDrawSize(new UE.Vector2D(1280, 720));
+        comp.RegisterComponent();
+        comp.SetTickWhenOffscreen(true);
+        comp.SetComponentTickEnabled(true);
+        comp.SetWidget(w2);                       // 就是 w2，不新建 widget
+
+        let n = 0;
+        const t = setInterval(function () {
+            n++;
+            const r = comp.GetRenderTarget();
+            log('w2 的 GetRenderTarget(' + n + ') → ' + (r ? String(r) : 'null'));
+            if (r) {
+                try {
+                    const px = UE.KismetRenderingLibrary.ReadRenderTargetPixel(world, r, 640, 360);
+                    log('w2 RT 中心像素=' + JSON.stringify(px));
+                } catch (e) { log('读像素失败: ' + e); }
+            }
+            if (n >= 3) { clearInterval(t); }
+        }, 1000);
+    } catch (e) {
+        log('取 w2 纹理失败: ' + e);
     }
 
     // 关闭按钮：容器右上角外侧
