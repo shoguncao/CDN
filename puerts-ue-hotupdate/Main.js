@@ -1,6 +1,6 @@
-// Main.js 5.5.0 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」
-// 配套 native：UNativeBridgeLib::CaptureViewToTexture(handle, w, h)
-const VERSION = '5.5.0';
+// Main.js 5.6.0 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
+const VERSION = '5.6.0';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -88,22 +88,59 @@ try {
         log('建离屏网页失败: ' + e);
     }
 
-    // ② 定时把网页画面抓成 UTexture2D 并显示
+    // ② 纯 JS：WKWebView 快照 → PNG 文件 → ImportFileAsTexture2D → UMG
+    //   关键：UE 已经把 FImageUtils 包成 UFUNCTION（KismetRenderingLibrary.h:137），
+    //   ImportFileAsTexture2D 返回 UTexture2D*，Puerts 自动包装成 JS 能用的对象。
+    //   所以这一步完全不需要改 native。
+    let PNG = '';
+    try {
+        const td = JSON.parse(B.CallCFunc('NSTemporaryDirectory', '@', '[]'));
+        PNG = td.v + 'wb_cap.png';
+        log('PNG 路径=' + PNG);
+    } catch (e) {
+        log('取临时目录失败: ' + e);
+    }
+
     let frames = 0, errLogged = false;
-    setInterval(function () {
-        if (!wv) { return; }
+
+    // WKWebView 快照是异步 block 回调；桥会把参数编码成 JSON 数组字符串，
+    // 用 Pump 取回（回调可能不在 JS 线程）
+    globalThis.__nb_cb_7 = function (a) {
         try {
-            const tex = UE.NativeBridgeLib.CaptureViewToTexture(wv, WV_W, WV_H);
-            if (!tex) {
-                if (!errLogged) { log('CaptureViewToTexture 返回 null'); errLogged = true; }
-                return;
-            }
+            const arr = JSON.parse(a);
+            const uiImg = arr[0].v;                  // UIImage 句柄
+            if (!uiImg) { log('快照为空'); return; }
+
+            // UIImagePNGRepresentation(UIImage*) -> NSData*（UIKit C 函数，CallCFunc 可调）
+            const r = JSON.parse(B.CallCFunc('UIImagePNGRepresentation', '@@',
+                JSON.stringify([{ t: 'h', v: uiImg }])));
+            if (r.t === 'e' || !r.v) { log('PNG 转换失败: ' + r.v); return; }
+
+            // 写文件 → 交给 UE 的 UFUNCTION 导入成 UTexture2D
+            invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
+            const tex = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
+            if (!tex) { log('ImportFileAsTexture2D 返回 null'); return; }
+
             img.SetBrushFromTexture(tex);
             frames++;
-            if (frames === 1) { log('★ 首帧纹理已显示（看容器里有没有网页）'); }
+            if (frames === 1) { log('★ 纯 JS 首帧纹理已显示（未改 native）'); }
             if (frames % 20 === 0) { log('已刷新 ' + frames + ' 帧'); }
         } catch (e) {
-            if (!errLogged) { log('抓纹理失败: ' + e); errLogged = true; }
+            if (!errLogged) { log('纯 JS 抓帧失败: ' + e); errLogged = true; }
+        }
+    };
+
+    setInterval(function () { B.Pump(); }, 100);
+
+    setInterval(function () {
+        if (!wv || !PNG) { return; }
+        try {
+            // takeSnapshotWithConfiguration:completionHandler:
+            // block 签名 v@?@@（返回 void，block 自身 @?，参数 UIImage* / NSError*）
+            invoke('#' + wv, 'takeSnapshotWithConfiguration:completionHandler:',
+                [{ t: 'n', v: 0 }, { t: 'bl', sig: 'v@?@@', cb: 7 }]);
+        } catch (e) {
+            if (!errLogged) { log('takeSnapshot 失败: ' + e); errLogged = true; }
         }
     }, 500);
 
