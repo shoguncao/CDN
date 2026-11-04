@@ -1,6 +1,6 @@
-// Main.js 5.6.6 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.7 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.6';
+const VERSION = '5.6.7';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -27,7 +27,7 @@ function invoke(target, method, args) {
     return r.v;
 }
 
-const URL = 'https://hk.keyso.uk/youtube-embed-api-demo.html';
+const URL = 'https://hk.keyso.uk/youtube-embed-api-demo.html?autoplay=1';
 const WV_W = 480, WV_H = 270;       // 离屏网页尺寸（点）
 
 try {
@@ -71,6 +71,8 @@ try {
     try {
         const cfg = invoke('#' + invoke('WKWebViewConfiguration', 'alloc', []), 'init', []);
         try { invoke('#' + cfg, 'setAllowsInlineMediaPlayback:', [true]); } catch (e) { }
+        // 方案 A：放开 WKWebView 自动播放策略（0 = WKAudiovisualMediaTypeNone）
+        try { invoke('#' + cfg, 'setMediaTypesRequiringUserActionForPlayback:', [0]); } catch (e) { }
         wv = invoke('#' + invoke('WKWebView', 'alloc', []),
             'initWithFrame:configuration:',
             [{ t: 'st', v: [vp.X + 50, 0, WV_W, WV_H] }, h(cfg)]);   // x 在屏幕外
