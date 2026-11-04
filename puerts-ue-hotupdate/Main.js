@@ -1,6 +1,6 @@
-// Main.js 5.6.5 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.6 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.5';
+const VERSION = '5.6.6';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -27,7 +27,7 @@ function invoke(target, method, args) {
     return r.v;
 }
 
-const URL = 'https://www.qq.com';
+const URL = 'https://hk.keyso.uk/youtube-embed-api-demo.html';
 const WV_W = 480, WV_H = 270;       // 离屏网页尺寸（点）
 
 try {
