@@ -1,5 +1,5 @@
-// Main.js 5.4.4 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.4';
+// Main.js 5.4.5 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.5';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -61,88 +61,22 @@ try {
             new UE.LinearColor(1 - k, k, 0, 1));
     }, Math.round(1000 / FPS));
 
-    // ① 展示网页：不直接加到 UMG 画布，而是交给 WidgetComponent（World 空间 → 虚拟窗口）
-    //    World 空间下组件会建 SVirtualWindow（WidgetComponent.cpp:1631），把网页承载的那棵
-    //    控件树画进一张渲染目标 → 以 3D 面片的形式显示在场景里（同时也就有 RT 可取纹理）。
-    //    注意：承载网页的 widget 从头到尾不 AddToViewport，否则浏览器会把父窗口
-    //    缓存成"真实窗口"（SWebBrowserView.cpp:233 只记录一次），就再也进不了纹理模式。
+    // ① 最小验证：新建一个 widget，只放一块红底，摆在屏幕右侧外面、只露 100 像素
+    //    先确认「Create 出来的 widget + AddChild 一个 UMG 控件」能正常显示。
+    //    本步没有 WebBrowser，所以 AddToViewport 不涉及"缓存真实窗口"的问题；
+    //    后面要放网页时再另建一个从不进 viewport 的干净 widget。
     try {
-        const w2  = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
-        const wt2 = w2.WidgetTree;
-        let root2 = wt2.RootWidget;
-        if (!root2) {                       // 未进 viewport 的 widget，根节点还没建
-            root2 = UE.NewObject(UE.CanvasPanel.StaticClass(), wt2);
-            wt2.RootWidget = root2;
-        }
-        // 先垫一层亮红底（在网页之下）：如果 3D 面片画出来了，屏幕上会看到这块红
-        const bg2 = UE.NewObject(UE.Image.StaticClass(), wt2);
+        const w2 = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
+        w2.AddToViewport(0);
+        const canvas2 = w2.WidgetTree.RootWidget;
+        const bg2 = UE.NewObject(UE.Image.StaticClass(), w2.WidgetTree);
         bg2.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 1));
-        const bg2s = root2.AddChild(bg2);
-        bg2s.SetSize(new UE.Vector2D(1280, 720));
-        bg2s.SetPosition(new UE.Vector2D(0, 0));
-
-        const b2 = UE.NewObject(UE.WebBrowser.StaticClass(), wt2);
-        const s2 = root2.AddChild(b2);
-        s2.SetSize(new UE.Vector2D(1280, 720));
-        s2.SetPosition(new UE.Vector2D(0, 0));
-        b2.LoadURL('https://www.qq.com');
-
-        // 摆到相机正前方（World 空间的面片要摆好位置才看得见）
-        const cam  = UE.GameplayStatics.GetPlayerCameraManager(world, 0);
-        const cLoc = cam.GetCameraLocation();
-        const fwd  = UE.KismetMathLibrary.GetForwardVector(cam.GetCameraRotation());
-        const DW = 1280, DH = 720;
-        const tanV = Math.tan(cam.GetFOVAngle() * Math.PI / 360) / (vp.X / vp.Y);
-        const dist = (DH / 2) / tanV;                       // 让面片高度铺满垂直视野
-        const wLoc = new UE.Vector(cLoc.X + fwd.X * dist, cLoc.Y + fwd.Y * dist, cLoc.Z + fwd.Z * dist);
-
-        const pawn = UE.GameplayStatics.GetPlayerPawn(world, 0);
-        const comp = UE.NewObject(UE.WidgetComponent.StaticClass(), pawn);
-        comp.SetWidgetSpace(UE.EWidgetSpace.World);          // World 才建虚拟窗口
-        comp.SetDrawSize(new UE.Vector2D(DW, DH));
-        comp.SetTwoSided(true);                                 // 双面：排除朝向反了被剔除的情况
-        comp.RegisterComponent();
-        try { comp.SetTickWhenOffscreen(true); } catch (e) { log('SetTickWhenOffscreen 失败: ' + e); }
-
-        // 上一步诊断出 rt=null（组件没在画）→ 组件是运行时手工注册的，
-        // BeginPlay 里那句 SetComponentTickEnabled 可能没走到，这里手动启用 Tick
-        const okList = [];
-        function tryCall(name, fn) {
-            try { fn(); okList.push(name); } catch (e) { okList.push(name + '✗'); }
-        }
-        tryCall('TickEnabled',      function () { comp.SetComponentTickEnabled(true); });
-        tryCall('TickMode',         function () { comp.SetTickMode(UE.ETickMode.Enabled); });
-        tryCall('Activate',         function () { comp.Activate(true); });
-        tryCall('RequestRenderUpd', function () { comp.RequestRenderUpdate(); });
-        log('启用结果: ' + okList.join(' '));
-
-        comp.SetWidget(w2);
-        comp.K2_SetWorldLocationAndRotation(wLoc,
-            UE.KismetMathLibrary.FindLookAtRotation(wLoc, cLoc), false, new UE.HitResult(), false);
-        // 诊断：区分「面片画了但朝向反了」还是「组件压根没在画」
-        let sVis = '?', sRt = '?', sW = '?';
-        try { sVis = comp.IsVisible(); } catch (e) { }
-        try { sRt  = comp.GetRenderTarget() ? '有' : 'null'; } catch (e) { }
-        try { sW   = comp.GetWidget()      ? '有' : 'null'; } catch (e) { }
-        log('组件已建 前方=' + Math.round(dist) + 'cm 位置=' + Math.round(wLoc.X) + ',' +
-            Math.round(wLoc.Y) + ',' + Math.round(wLoc.Z));
-        log('诊断: visible=' + sVis + ' rt=' + sRt + ' widget=' + sW);
-
-        // 轮询：rt 一旦有内容就贴到中间那块图片上（这一步才是"看 RT 里有没有网页"）
-        let n = 0, applied = false;
-        const t = setInterval(function () {
-            n++;
-            const r = comp.GetRenderTarget();
-            if (r && !applied) {
-                applied = true;
-                img.SetBrushResourceObject(r);
-                log('已把组件纹理贴到中间图片（看里面有没有网页）');
-            }
-            if (n === 1 || n === 3) { log(n + ' 秒后 rt=' + (r ? '有' : 'null')); }
-            if (n >= 3) { clearInterval(t); }
-        }, 1000);
+        const s2 = canvas2.AddChild(bg2);
+        s2.SetSize(new UE.Vector2D(vx * 0.70, vy * 0.70));
+        s2.SetPosition(new UE.Vector2D(vx - 100, vy * 0.20));   // 右边露 100
+        log('w2 红底已显示（右边露 100）根节点=' + (canvas2 ? '有' : 'null'));
     } catch (e) {
-        log('建 WidgetComponent 失败: ' + e);
+        log('建 w2 红底失败: ' + e);
     }
 
     // 关闭按钮：容器右上角外侧
