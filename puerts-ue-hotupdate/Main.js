@@ -1,6 +1,6 @@
-// Main.js 5.6.2 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.3 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.2';
+const VERSION = '5.6.3';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -122,7 +122,7 @@ try {
             let jpgOk = '';
             try {
                 const j = JSON.parse(B.CallCFunc('UIImageJPEGRepresentation', '@@d',
-                    JSON.stringify([{ t: 'h', v: uiImg }, 0.85])));
+                    JSON.stringify([{ t: 'h', v: uiImg }, { t: 'd', v: 0.85 }])));
                 if (j.t !== 'e' && j.v) {
                     invoke('#' + j.v, 'writeToFile:atomically:', [JPG, true]);
                     jpgOk = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, JPG) ? 'OK' : 'null';
@@ -137,6 +137,25 @@ try {
             const texJ = (jpgOk === 'OK') ? UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, JPG) : null;
             const st = 'P=' + (texP ? 'OK' : 'null') + ' J=' + jpgOk + ' reread=' + rd;
             if (st !== lastStatus) { log(st); lastStatus = st; }
+
+            // 两条路线都失败 → 挖 UE 日志，看 LogImageUtils/LogTexture 打的失败原因
+            if (!texP && jpgOk !== 'OK' && !errLogged) {
+                errLogged = true;
+                try {
+                    const saved = UE.KismetSystemLibrary.GetProjectSavedDirectory();
+                    const logPath = saved + 'Logs/PuertsUEDemo.log';
+                    const txt = invoke('NSString', 'stringWithContentsOfFile:encoding:error:',
+                        [logPath, 4, { t: 'n', v: 0 }]);
+                    if (typeof txt === 'string' && txt.length) {
+                        const hits = txt.split('\n')
+                            .filter(l => l.indexOf('LogImageUtils') >= 0 || l.indexOf('Error creating texture') >= 0 || l.indexOf('LogTexture') >= 0)
+                            .slice(-3).map(l => l.slice(-120));
+                        log('日志(' + hits.length + '): ' + hits.join(' | '));
+                    } else {
+                        log('读不到日志 saved=' + saved);
+                    }
+                } catch (e3) { log('读日志失败: ' + e3); }
+            }
 
             // 哪条能用就用哪条
             const tex = texP || texJ;
