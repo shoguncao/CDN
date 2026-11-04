@@ -1,5 +1,5 @@
-// Main.js 5.4.5 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.5';
+// Main.js 5.4.6 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.6';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -61,22 +61,19 @@ try {
             new UE.LinearColor(1 - k, k, 0, 1));
     }, Math.round(1000 / FPS));
 
-    // ① 最小验证：新建一个 widget，只放一块红底，摆在屏幕右侧外面、只露 100 像素
-    //    先确认「Create 出来的 widget + AddChild 一个 UMG 控件」能正常显示。
-    //    本步没有 WebBrowser，所以 AddToViewport 不涉及"缓存真实窗口"的问题；
-    //    后面要放网页时再另建一个从不进 viewport 的干净 widget。
+    // ① 最小验证：新建一个 widget，放一个 WebBrowser，摆在屏幕右侧外面、只露 100 像素
     try {
         const w2 = UE.WidgetBlueprintLibrary.Create(world, UE.HotUpdateWidget.StaticClass(), pc);
         w2.AddToViewport(0);
         const canvas2 = w2.WidgetTree.RootWidget;
-        const bg2 = UE.NewObject(UE.Image.StaticClass(), w2.WidgetTree);
-        bg2.SetColorAndOpacity(new UE.LinearColor(1, 0, 0, 1));
-        const s2 = canvas2.AddChild(bg2);
+        const b2 = UE.NewObject(UE.WebBrowser.StaticClass(), w2.WidgetTree);
+        const s2 = canvas2.AddChild(b2);
         s2.SetSize(new UE.Vector2D(vx * 0.70, vy * 0.70));
         s2.SetPosition(new UE.Vector2D(vx - 100, vy * 0.20));   // 右边露 100
-        log('w2 红底已显示（右边露 100）根节点=' + (canvas2 ? '有' : 'null'));
+        b2.LoadURL('https://www.qq.com');
+        log('w2 网页已显示（右边露 100）根节点=' + (canvas2 ? '有' : 'null'));
     } catch (e) {
-        log('建 w2 红底失败: ' + e);
+        log('建 w2 网页失败: ' + e);
     }
 
     // 关闭按钮：容器右上角外侧
