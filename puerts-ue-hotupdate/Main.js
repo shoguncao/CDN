@@ -1,6 +1,6 @@
-// Main.js 5.6.0 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.1 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.0';
+const VERSION = '5.6.1';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -117,7 +117,13 @@ try {
             if (r.t === 'e' || !r.v) { log('PNG 转换失败: ' + r.v); return; }
 
             // 写文件 → 交给 UE 的 UFUNCTION 导入成 UTexture2D
-            invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
+            const len = invoke('#' + r.v, 'length', []);
+            const written = invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
+            const fm = invoke('NSFileManager', 'defaultManager', []);
+            const exists = invoke('#' + fm, 'fileExistsAtPath:', [PNG]);
+            if (frames === 0) { log('诊断: dataLen=' + len + ' written=' + written + ' exists=' + exists); }
+            if (!written) { log('写文件失败'); return; }
+
             const tex = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
             if (!tex) { log('ImportFileAsTexture2D 返回 null'); return; }
 
