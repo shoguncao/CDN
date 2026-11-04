@@ -1,6 +1,6 @@
-// Main.js 5.6.1 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.2 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.1';
+const VERSION = '5.6.2';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -92,16 +92,17 @@ try {
     //   关键：UE 已经把 FImageUtils 包成 UFUNCTION（KismetRenderingLibrary.h:137），
     //   ImportFileAsTexture2D 返回 UTexture2D*，Puerts 自动包装成 JS 能用的对象。
     //   所以这一步完全不需要改 native。
-    let PNG = '';
+    let PNG = '', JPG = '';
     try {
         const td = JSON.parse(B.CallCFunc('NSTemporaryDirectory', '@', '[]'));
         PNG = td.v + 'wb_cap.png';
+        JPG = td.v + 'wb_cap.jpg';
         log('PNG 路径=' + PNG);
     } catch (e) {
         log('取临时目录失败: ' + e);
     }
 
-    let frames = 0, errLogged = false;
+    let frames = 0, lastStatus = '';
 
     // WKWebView 快照是异步 block 回调；桥会把参数编码成 JSON 数组字符串，
     // 用 Pump 取回（回调可能不在 JS 线程）
@@ -109,28 +110,41 @@ try {
         try {
             const arr = JSON.parse(a);
             const uiImg = arr[0].v;                  // UIImage 句柄
-            if (!uiImg) { log('快照为空'); return; }
+            if (!uiImg) { if (lastStatus !== 'empty') { log('快照为空'); lastStatus = 'empty'; } return; }
 
-            // UIImagePNGRepresentation(UIImage*) -> NSData*（UIKit C 函数，CallCFunc 可调）
+            // PNG 路线
             const r = JSON.parse(B.CallCFunc('UIImagePNGRepresentation', '@@',
                 JSON.stringify([{ t: 'h', v: uiImg }])));
             if (r.t === 'e' || !r.v) { log('PNG 转换失败: ' + r.v); return; }
+            invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
 
-            // 写文件 → 交给 UE 的 UFUNCTION 导入成 UTexture2D
-            const len = invoke('#' + r.v, 'length', []);
-            const written = invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
-            const fm = invoke('NSFileManager', 'defaultManager', []);
-            const exists = invoke('#' + fm, 'fileExistsAtPath:', [PNG]);
-            if (frames === 0) { log('诊断: dataLen=' + len + ' written=' + written + ' exists=' + exists); }
-            if (!written) { log('写文件失败'); return; }
+            // JPEG 路线（对照：UIImageJPEGRepresentation(UIImage*, CGFloat compression)）
+            let jpgOk = '';
+            try {
+                const j = JSON.parse(B.CallCFunc('UIImageJPEGRepresentation', '@@d',
+                    JSON.stringify([{ t: 'h', v: uiImg }, 0.85])));
+                if (j.t !== 'e' && j.v) {
+                    invoke('#' + j.v, 'writeToFile:atomically:', [JPG, true]);
+                    jpgOk = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, JPG) ? 'OK' : 'null';
+                } else { jpgOk = 'convFail'; }
+            } catch (e2) { jpgOk = 'err:' + e2; }
 
-            const tex = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
-            if (!tex) { log('ImportFileAsTexture2D 返回 null'); return; }
+            // 重读磁盘文件，确认写进去的字节完整
+            const rd = invoke('#' + invoke('NSData', 'dataWithContentsOfFile:', [PNG]), 'length', []);
 
-            img.SetBrushFromTexture(tex);
-            frames++;
-            if (frames === 1) { log('★ 纯 JS 首帧纹理已显示（未改 native）'); }
-            if (frames % 20 === 0) { log('已刷新 ' + frames + ' 帧'); }
+            // 各路线导入结果
+            const texP = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
+            const texJ = (jpgOk === 'OK') ? UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, JPG) : null;
+            const st = 'P=' + (texP ? 'OK' : 'null') + ' J=' + jpgOk + ' reread=' + rd;
+            if (st !== lastStatus) { log(st); lastStatus = st; }
+
+            // 哪条能用就用哪条
+            const tex = texP || texJ;
+            if (tex) {
+                img.SetBrushFromTexture(tex);
+                frames++;
+                if (frames === 1) { log('★ 纯 JS 首帧纹理已显示（未改 native）'); }
+            }
         } catch (e) {
             if (!errLogged) { log('纯 JS 抓帧失败: ' + e); errLogged = true; }
         }
