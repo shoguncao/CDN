@@ -1,6 +1,6 @@
-// Main.js 5.6.3 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.4 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.3';
+const VERSION = '5.6.4';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -92,17 +92,19 @@ try {
     //   关键：UE 已经把 FImageUtils 包成 UFUNCTION（KismetRenderingLibrary.h:137），
     //   ImportFileAsTexture2D 返回 UTexture2D*，Puerts 自动包装成 JS 能用的对象。
     //   所以这一步完全不需要改 native。
-    let PNG = '', JPG = '';
+    let PNG = '', JPG = '', SAVED = '';
     try {
         const td = JSON.parse(B.CallCFunc('NSTemporaryDirectory', '@', '[]'));
         PNG = td.v + 'wb_cap.png';
         JPG = td.v + 'wb_cap.jpg';
+        SAVED = UE.KismetSystemLibrary.GetProjectSavedDirectory() + 'wb_cap.png';
         log('PNG 路径=' + PNG);
+        log('SAVED 路径=' + SAVED);
     } catch (e) {
-        log('取临时目录失败: ' + e);
+        log('取路径失败: ' + e);
     }
 
-    let frames = 0, lastStatus = '';
+    let frames = 0, errLogged = false, lastSt = '';
 
     // WKWebView 快照是异步 block 回调；桥会把参数编码成 JSON 数组字符串，
     // 用 Pump 取回（回调可能不在 JS 线程）
@@ -110,15 +112,17 @@ try {
         try {
             const arr = JSON.parse(a);
             const uiImg = arr[0].v;                  // UIImage 句柄
-            if (!uiImg) { if (lastStatus !== 'empty') { log('快照为空'); lastStatus = 'empty'; } return; }
+            if (!uiImg) { if (lastSt !== 'empty') { log('快照为空'); lastSt = 'empty'; } return; }
 
-            // PNG 路线
+            // PNG 数据写两个位置：iOS 临时目录 / UE 自己的 Saved 目录
+            // （对照：UE 的 LoadFileToArray 能否读到沙盒 tmp 路径）
             const r = JSON.parse(B.CallCFunc('UIImagePNGRepresentation', '@@',
                 JSON.stringify([{ t: 'h', v: uiImg }])));
             if (r.t === 'e' || !r.v) { log('PNG 转换失败: ' + r.v); return; }
             invoke('#' + r.v, 'writeToFile:atomically:', [PNG, true]);
+            invoke('#' + r.v, 'writeToFile:atomically:', [SAVED, true]);
 
-            // JPEG 路线（对照：UIImageJPEGRepresentation(UIImage*, CGFloat compression)）
+            // 对照路线：JPEG（排除 PNG 解码环节）
             let jpgOk = '';
             try {
                 const j = JSON.parse(B.CallCFunc('UIImageJPEGRepresentation', '@@d',
@@ -129,40 +133,36 @@ try {
                 } else { jpgOk = 'convFail'; }
             } catch (e2) { jpgOk = 'err:' + e2; }
 
-            // 重读磁盘文件，确认写进去的字节完整
-            const rd = invoke('#' + invoke('NSData', 'dataWithContentsOfFile:', [PNG]), 'length', []);
+            const texT = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
+            const texS = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, SAVED);
+            const st = 'tmp=' + (texT ? 'OK' : 'null') + ' saved=' + (texS ? 'OK' : 'null') + ' J=' + jpgOk;
+            if (st !== lastSt) { log(st); lastSt = st; }
 
-            // 各路线导入结果
-            const texP = UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, PNG);
-            const texJ = (jpgOk === 'OK') ? UE.KismetRenderingLibrary.ImportFileAsTexture2D(world, JPG) : null;
-            const st = 'P=' + (texP ? 'OK' : 'null') + ' J=' + jpgOk + ' reread=' + rd;
-            if (st !== lastStatus) { log(st); lastStatus = st; }
-
-            // 两条路线都失败 → 挖 UE 日志，看 LogImageUtils/LogTexture 打的失败原因
-            if (!texP && jpgOk !== 'OK' && !errLogged) {
-                errLogged = true;
-                try {
-                    const saved = UE.KismetSystemLibrary.GetProjectSavedDirectory();
-                    const logPath = saved + 'Logs/PuertsUEDemo.log';
-                    const txt = invoke('NSString', 'stringWithContentsOfFile:encoding:error:',
-                        [logPath, 4, { t: 'n', v: 0 }]);
-                    if (typeof txt === 'string' && txt.length) {
-                        const hits = txt.split('\n')
-                            .filter(l => l.indexOf('LogImageUtils') >= 0 || l.indexOf('Error creating texture') >= 0 || l.indexOf('LogTexture') >= 0)
-                            .slice(-3).map(l => l.slice(-120));
-                        log('日志(' + hits.length + '): ' + hits.join(' | '));
-                    } else {
-                        log('读不到日志 saved=' + saved);
-                    }
-                } catch (e3) { log('读日志失败: ' + e3); }
-            }
-
-            // 哪条能用就用哪条
-            const tex = texP || texJ;
+            const tex = texT || texS;
             if (tex) {
                 img.SetBrushFromTexture(tex);
                 frames++;
                 if (frames === 1) { log('★ 纯 JS 首帧纹理已显示（未改 native）'); }
+                return;
+            }
+
+            // 全部失败 → 2 秒后挖 UE 日志（延后保证屏幕能看到，不被刷掉）
+            if (!errLogged) {
+                errLogged = true;
+                setTimeout(function () {
+                    try {
+                        const logPath = UE.KismetSystemLibrary.GetProjectSavedDirectory() + 'Logs/PuertsUEDemo.log';
+                        const txt = invoke('NSString', 'stringWithContentsOfFile:encoding:error:',
+                            [logPath, 4, { t: 'n', v: 0 }]);
+                        if (typeof txt === 'string' && txt.length) {
+                            const hits = txt.split('\n')
+                                .filter(l => l.indexOf('LogImageUtils') >= 0 || l.indexOf('Error creating texture') >= 0 || l.indexOf('LogTexture') >= 0)
+                                .slice(-4).map(l => l.slice(-110));
+                            log('UE日志(' + hits.length + '):');
+                            hits.forEach(l => log(l));
+                        } else { log('读不到日志文件'); }
+                    } catch (e3) { log('读日志失败: ' + e3); }
+                }, 2000);
             }
         } catch (e) {
             if (!errLogged) { log('纯 JS 抓帧失败: ' + e); errLogged = true; }
