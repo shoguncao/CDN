@@ -1,6 +1,6 @@
-// Main.js 5.6.8 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.9 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.8';
+const VERSION = '5.6.9';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -66,8 +66,17 @@ try {
     btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 32));
     btn.OnClicked.Add(function () { w.RemoveFromViewport(); });
 
-    // ① 用桥造一个原生 WKWebView，放在屏幕外，只当渲染源
-    let wv = 0;
+    // ① 用桥造一个原生 WKWebView，右侧露出 100 宽，只当渲染源 + 原生画面对照
+    //   注意：UE viewport（vp.X）与 UIView 的屏幕点不是一套坐标系，不能拿 vp.X 当屏幕宽。
+    let wv = 0, screenW = 0;
+    try {
+        const scr = invoke('UIScreen', 'mainScreen', []);
+        const bd = invoke('#' + scr, 'bounds', []);       // {t:'st',v:[x,y,w,h]}
+        screenW = Array.isArray(bd) ? bd[2] : (bd && bd.v ? bd.v[2] : 0);
+    } catch (e) { log('取屏幕宽失败: ' + e); }
+    log('vp.X=' + vp.X + ' screenW=' + screenW);
+    const wvX = (screenW > 0 ? screenW : vp.X) - 100;
+
     try {
         const cfg = invoke('#' + invoke('WKWebViewConfiguration', 'alloc', []), 'init', []);
         try { invoke('#' + cfg, 'setAllowsInlineMediaPlayback:', [true]); } catch (e) { }
@@ -75,7 +84,7 @@ try {
         try { invoke('#' + cfg, 'setMediaTypesRequiringUserActionForPlayback:', [0]); } catch (e) { }
         wv = invoke('#' + invoke('WKWebView', 'alloc', []),
             'initWithFrame:configuration:',
-            [{ t: 'st', v: [vp.X - 100, 0, WV_W, WV_H] }, h(cfg)]);   // 屏幕右侧露出 100 宽
+            [{ t: 'st', v: [wvX, 0, WV_W, WV_H] }, h(cfg)]);   // 屏幕右侧露出 100 宽
 
         const nsurl = invoke('NSURL', 'URLWithString:', [URL]);
         const req   = invoke('NSURLRequest', 'requestWithURL:', [h(nsurl)]);
