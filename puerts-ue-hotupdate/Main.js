@@ -1,6 +1,6 @@
-// Main.js 5.6.7 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
+// Main.js 5.6.8 —— 验证「原生网页画面 → UTexture2D → 画进 UMG」（纯 JS，未改 native）
 // 关键：UE 已有 UFUNCTION KismetRenderingLibrary::ImportFileAsTexture2D
-const VERSION = '5.6.7';
+const VERSION = '5.6.8';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -75,7 +75,7 @@ try {
         try { invoke('#' + cfg, 'setMediaTypesRequiringUserActionForPlayback:', [0]); } catch (e) { }
         wv = invoke('#' + invoke('WKWebView', 'alloc', []),
             'initWithFrame:configuration:',
-            [{ t: 'st', v: [vp.X + 50, 0, WV_W, WV_H] }, h(cfg)]);   // x 在屏幕外
+            [{ t: 'st', v: [vp.X - 100, 0, WV_W, WV_H] }, h(cfg)]);   // 屏幕右侧露出 100 宽
 
         const nsurl = invoke('NSURL', 'URLWithString:', [URL]);
         const req   = invoke('NSURLRequest', 'requestWithURL:', [h(nsurl)]);
