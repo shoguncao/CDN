@@ -1,5 +1,5 @@
-// Main.js 5.4.7 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
-const VERSION = '5.4.7';
+// Main.js 5.4.8 —— 容器（宽高为屏幕 0.618，居中）+ 右上角关闭按钮 + 中间网页
+const VERSION = '5.4.8';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);                       // PrintString 位置写死在左上，靠空格避开刘海
@@ -105,6 +105,7 @@ try {
             const r = comp.GetRenderTarget();
             log('w2 的 GetRenderTarget(' + n + ') → ' + (r ? String(r) : 'null'));
             if (r) {
+                if (n === 1) { img.SetBrushResourceObject(r); log('已把 w2 的 RT 贴到中间图片'); }
                 try {
                     const px = UE.KismetRenderingLibrary.ReadRenderTargetPixel(world, r, 640, 360);
                     log('w2 RT 中心像素=' + JSON.stringify(px));
