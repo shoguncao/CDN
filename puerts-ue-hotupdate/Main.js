@@ -1,8 +1,8 @@
-// Main.js 5.7.6 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
+// Main.js 5.7.7 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
 // iOS：网页放最底层，IOSView 挖洞露出它，洞内给关闭按钮「留岛」
 // Android：桥造 android.webkit.WebView + addContentView 放上层（先可见，下一步改下层）
 // 依赖桥新加的 RunOnUIThreadAndroid：invoke 默认切 UI 线程，thread=current 不切
-const VERSION = '5.7.6';
+const VERSION = '5.7.7';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -221,6 +221,42 @@ try {
         invoke('#' + awv, 'loadUrl', [URL]);
 
         log('Android WebView=' + awv + ' frame=' + [ax, ay, aw, ah].map(Math.round).join(','));
+
+        // ---- 定位诊断：不改任何行为，只采数据 ----
+        // 上一版按 DecorView/content 基准算居中没生效（日志 content 仍是 2960），
+        // 而 uiautomator 在布局完成后测到的 content 是 2834 —— 说明启动瞬间的
+        // 尺寸快照不可靠。这里延迟到窗口稳定，把两边坐标系的真实数值一次打全：
+        //   A: 稳定后的 content 尺寸 + WebView 实际落在父容器里的矩形
+        //   B: UE viewport / DPI scale / UMG 容器 slot 坐标（原始值，不做换算假设）
+        if (typeof setTimeout === 'function') {
+            setTimeout(function () {
+                try {
+                    const win = invoke('@activity', 'getWindow', []);
+                    const decor = invoke('#' + win, 'getDecorView', []);
+                    let base = decor;
+                    try {
+                        const c = invoke('#' + decor, 'findViewById', [16908290]);
+                        if (c) { base = c; }
+                    } catch (e3) { }
+                    const cw = invoke('#' + base, 'getWidth', []);
+                    const ch = invoke('#' + base, 'getHeight', []);
+                    const l = invoke('#' + awv, 'getLeft', []);
+                    const t = invoke('#' + awv, 'getTop', []);
+                    const w = invoke('#' + awv, 'getWidth', []);
+                    const h = invoke('#' + awv, 'getHeight', []);
+                    log('定位A content=' + cw + 'x' + ch
+                        + ' WebView LTWH=' + [l, t, w, h].join(','));
+                    let dpi = 0;
+                    try { dpi = UE.WidgetLayoutLibrary.GetViewportScale(world); } catch (e3) { }
+                    log('定位B vp=' + Math.round(vp.X) + 'x' + Math.round(vp.Y)
+                        + ' dpi=' + Number(dpi).toFixed(3)
+                        + ' UMG p=' + Math.round(p.X) + ',' + Math.round(p.Y)
+                        + ' s=' + Math.round(s.X) + ',' + Math.round(s.Y)
+                        + ' DS=1.374');
+                } catch (e2) { log('定位诊断失败: ' + e2); }
+            }, 2000);
+        }
+
         log('Android：桥造 WebView 已加到上层 版本 ' + VERSION);
     }
 } catch (e) {
