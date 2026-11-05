@@ -1,8 +1,8 @@
-// Main.js 5.7.9 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
+// Main.js 5.7.10 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
 // iOS：网页放最底层，IOSView 挖洞露出它，洞内给关闭按钮「留岛」
-// Android：桥造 WebView 放上层；5.7.9 加 setZOrderOnTop 层级实验
+// Android：桥造 WebView 放上层（5.7.9 层级实验已撤销，恢复 5.7.8 行为）
 // 依赖桥新加的 RunOnUIThreadAndroid：invoke 默认切 UI 线程，thread=current 不切
-const VERSION = '5.7.9';
+const VERSION = '5.7.10';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -235,56 +235,9 @@ try {
         log('Android WebView=' + awv + ' k=' + k.toFixed(3)
             + ' frame=' + [ax, ay, aw, ah].map(Math.round).join(','));
 
-        // ---- 层级实验（5.7.9）：只验证「WebView 能否落到游戏画面下面」----
-        // 纯 JS + 现有桥，只调 public Java API，不动 native/引擎/其它逻辑。
-        // UE 的游戏画面在引擎创建的 SurfaceView 上（GameActivity.java.template:2988），
-        // 默认其 Surface 在 Window 后面；setZOrderOnTop(true) 把它提到 Window 之上，
-        // 这样画在 Window 上的 WebView 就落到下层。
-        // 预期：成功时游戏画面（含 UMG）盖住 WebView，网页暂时看不见 —— 这正是
-        // 下一步「游戏层打洞透出网页」的前提。本实验不做打洞。
-        // 注意：本机 Android 9 / targetSdk 28。AOSP setZOrderOnTop 只在
-        // targetSdk > 29 时才走 setZOrderedOnTop(allowDynamicChange=true) 立即
-        // updateSurface()；老版本只改 mRequestedSubLayer，要靠下一次
-        // OnPreDrawListener -> updateSurface() 才应用。所以额外调 invalidate()
-        // 触发一帧重绘，尽量让层级变化在运行时生效。若仍无效，日志会照常打出，
-        // 画面不变即说明此路在这台机不通。
-        const Z_ORDER_PROBE = true;
-        function findSurfaceView(v, depth) {
-            if (!v || depth > 6) return 0;
-            let name = '';
-            try {
-                const cls = invoke('#' + v, 'getClass', []);
-                name = String(invoke('#' + cls, 'getName', []));
-            } catch (e3) { }
-            if (name === 'android.view.SurfaceView') return v;
-            let n = 0;
-            try { n = invoke('#' + v, 'getChildCount', []); } catch (e3) { return 0; }
-            for (let i = 0; i < n && i < 12; i++) {
-                let child = 0;
-                try { child = invoke('#' + v, 'getChildAt', [i]); } catch (e3) { continue; }
-                const found = findSurfaceView(child, depth + 1);
-                if (found) return found;
-            }
-            return 0;
-        }
-        if (Z_ORDER_PROBE) {
-            try {
-                const win2 = invoke('@activity', 'getWindow', []);
-                const decor2 = invoke('#' + win2, 'getDecorView', []);
-                const surface = findSurfaceView(decor2, 0);
-                log('层级 SurfaceView句柄=' + surface);
-                if (surface) {
-                    invoke('#' + surface, 'setZOrderOnTop', [true]);
-                    log('层级 setZOrderOnTop(true) 已调用');
-                    // 触发重绘，让 OnPreDrawListener -> updateSurface() 应用新的 mSubLayer
-                    invoke('#' + surface, 'invalidate', []);
-                    invoke('#' + decor2, 'invalidate', []);
-                    log('层级 invalidate 已触发');
-                } else {
-                    log('层级 未找到 SurfaceView（遍历深度/类名不符）');
-                }
-            } catch (e2) { log('层级 实验失败: ' + e2); }
-        }
+        // 5.7.9 的 setZOrderOnTop 层级实验已撤销：本机 Android 9 / targetSdk 28
+        // 运行时改 z-order 不生效（z 仍 -2），且 invalidate() 会让游戏 Surface
+        // 不显示、只剩 WebView 内容。此路不通，恢复 5.7.8 的行为。
 
         // ---- 延迟核对：确认窗口稳定后 WebView 的落点仍与 UMG 容器一致 ----
         // 5.7.7 的诊断实测：稳定后 content 仍是 2960x1440（并非之前推测的 resize），
