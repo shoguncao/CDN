@@ -1,6 +1,7 @@
-// Main.js 5.7.2 —— maskView 挖洞方案：网页放最底层，游戏 Metal 层挖洞露出它
-// 关键取舍：洞内 UMG 一并被挖空（容器边框、右上角 ✕ 在洞外，仍可见可点）
-const VERSION = '5.7.2';
+// Main.js 5.7.3 —— maskView 挖洞方案（仅 iOS）；Android 只展示空容器
+// iOS：网页放最底层，IOSView 挖洞露出它，洞内给关闭按钮「留岛」
+// Android：原生视图逻辑全部跳过，容器 + 右上角 ✕ 仍正常显示
+const VERSION = '5.7.3';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -11,7 +12,9 @@ function log(m) {
 function T(s) { return UE.KismetTextLibrary.Conv_StringToText(s); }
 
 // ---------- NativeBridge 调用封装 ----------
-const B = require('cpp').NativeBridge;
+// Android 上也存在这个模块（JNI 分支），但为保险起见，加载失败不能连累容器显示
+let B = null;
+try { B = require('cpp').NativeBridge; } catch (e) { }
 function arg(v) {
     if (v === null || v === undefined) return { t: 'n', v: 0 };
     if (typeof v === 'boolean')        return { t: 'b', v: v };
@@ -21,11 +24,17 @@ function arg(v) {
 }
 const h = id => ({ t: 'h', v: id });
 function invoke(target, method, args) {
+    if (!B) { throw new Error('NativeBridge 不可用'); }
     const r = JSON.parse(B.Invoke(String(target), method,
         JSON.stringify((args || []).map(arg)), '', ''));
     if (r.t === 'e') throw new Error(r.v);
     return r.v;
 }
+
+// 平台判断：沿用 Main_demo.js 的写法 —— 调一个 iOS 独有的类，抛错就是 Android。
+// 不额外加原生接口。B 不可用时也按 Android 处理（容器照常显示）。
+let IS_IOS = false;
+try { invoke('NSProcessInfo', 'processInfo', []); IS_IOS = true; } catch (e) { }
 
 const URL = 'https://hk.keyso.uk/youtube-embed-api-demo.html?autoplay=1';
 
@@ -59,6 +68,9 @@ try {
     btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 32));
     btn.OnClicked.Add(function () { w.RemoveFromViewport(); });
 
+    // ---- 以下原生视图逻辑仅 iOS 执行 ----
+    // Android 走到这里只保留上面的容器 + 右上角 ✕（空容器），不碰任何 iOS/ObjC 类
+    if (IS_IOS) {
     // ---- ② 取 UE 的视图层级，以及 IOSView 自己的 bounds/frame ----
     // 坐标基准统一用 IOSView（Metal 游戏层）的 iOS 屏幕点，不做任何 UE<->iOS 换算：
     //   maskView 及其子视图的坐标系 = IOSView.bounds
@@ -145,6 +157,9 @@ try {
     invoke('#' + iosView, 'setMaskView:', [h(maskV)]);
 
     log('maskView 已设 版本 ' + VERSION);
+    } else {
+        log('Android：仅展示空容器 版本 ' + VERSION);
+    }
 } catch (e) {
     log('错误: ' + e);
 }
