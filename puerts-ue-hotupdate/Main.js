@@ -1,8 +1,8 @@
-// Main.js 5.7.7 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
+// Main.js 5.7.8 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
 // iOS：网页放最底层，IOSView 挖洞露出它，洞内给关闭按钮「留岛」
 // Android：桥造 android.webkit.WebView + addContentView 放上层（先可见，下一步改下层）
 // 依赖桥新加的 RunOnUIThreadAndroid：invoke 默认切 UI 线程，thread=current 不切
-const VERSION = '5.7.7';
+const VERSION = '5.7.8';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -209,10 +209,22 @@ try {
         invoke('#' + ws, 'setDomStorageEnabled', [true]);
         try { invoke('#' + ws, 'setMediaPlaybackRequiresUserGesture', [false]); } catch (e2) { }
 
-        // 0.618 居中，与 UMG 容器同一视觉位置；只用 Android 屏幕点，不做 UE<->Android 换算
+        // 直接跟随 UMG 容器的实际屏幕矩形，不再两边各自按 0.618 猜。
+        // UMG slot 是 Slate 单位，渲染链路：Slate * dpi -> viewport 像素,
+        // 再 * (Android屏幕点 / viewport像素) -> Android 屏幕点。
+        // 实测 NE2210: vp=1480x720, content=2960x1440, dpi=0.666
+        //   k = 0.666 * (2960/1480) = 1.332
+        //   UMG 容器 p=388,189 s=1257,611 -> (517,252,1675,814)
+        // 旧算法按屏幕 0.618 -> (568,278,1823,884)，偏右下且大一圈（与截图一致）。
+        let k;
+        try {
+            k = UE.WidgetLayoutLibrary.GetViewportScale(world) * (dw / vp.X);
+        } catch (e2) {
+            k = (1 / 1.374) * (dw / vp.X);      // 兜底：用 iOS 经验值的倒数估 dpi
+        }
         const gap = 3;
-        const aw = Math.max(1, dw * 0.618 - gap * 2), ah = Math.max(1, dh * 0.618 - gap * 2);
-        const ax = (dw - aw) / 2, ay = (dh - ah) / 2;
+        const aw = Math.max(1, s.X * k - gap * 2), ah = Math.max(1, s.Y * k - gap * 2);
+        const ax = p.X * k + gap, ay = p.Y * k + gap;
         // FrameLayout$LayoutParams(int,int,int) 是唯一的三参构造，避开两参重载歧义
         const lp = invoke('android.widget.FrameLayout$LayoutParams', '<init>',
             [Math.round(aw), Math.round(ah), 0]);
@@ -220,14 +232,14 @@ try {
         invoke('@activity', 'addContentView', [h(awv), h(lp)]);
         invoke('#' + awv, 'loadUrl', [URL]);
 
-        log('Android WebView=' + awv + ' frame=' + [ax, ay, aw, ah].map(Math.round).join(','));
+        log('Android WebView=' + awv + ' k=' + k.toFixed(3)
+            + ' frame=' + [ax, ay, aw, ah].map(Math.round).join(','));
 
-        // ---- 定位诊断：不改任何行为，只采数据 ----
-        // 上一版按 DecorView/content 基准算居中没生效（日志 content 仍是 2960），
-        // 而 uiautomator 在布局完成后测到的 content 是 2834 —— 说明启动瞬间的
-        // 尺寸快照不可靠。这里延迟到窗口稳定，把两边坐标系的真实数值一次打全：
+        // ---- 延迟核对：确认窗口稳定后 WebView 的落点仍与 UMG 容器一致 ----
+        // 5.7.7 的诊断实测：稳定后 content 仍是 2960x1440（并非之前推测的 resize），
+        // 真正错因是 UMG slot 与 WebView 用了两套坐标系。这里保留读数用于复核：
         //   A: 稳定后的 content 尺寸 + WebView 实际落在父容器里的矩形
-        //   B: UE viewport / DPI scale / UMG 容器 slot 坐标（原始值，不做换算假设）
+        //   B: UE viewport / DPI scale / UMG 容器 slot 坐标
         if (typeof setTimeout === 'function') {
             setTimeout(function () {
                 try {
