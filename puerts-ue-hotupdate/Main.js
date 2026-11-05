@@ -1,7 +1,8 @@
-// Main.js 5.7.3 —— maskView 挖洞方案（仅 iOS）；Android 只展示空容器
+// Main.js 5.7.5 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
 // iOS：网页放最底层，IOSView 挖洞露出它，洞内给关闭按钮「留岛」
-// Android：原生视图逻辑全部跳过，容器 + 右上角 ✕ 仍正常显示
-const VERSION = '5.7.3';
+// Android：桥造 android.webkit.WebView + addContentView 放上层（先可见，下一步改下层）
+// 依赖桥新加的 RunOnUIThreadAndroid：invoke 默认切 UI 线程，thread=current 不切
+const VERSION = '5.7.5';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -23,18 +24,24 @@ function arg(v) {
     return v;
 }
 const h = id => ({ t: 'h', v: id });
-function invoke(target, method, args) {
+// sig: 显式方法签名；opts: 'thread=current' 表示不切 UI 线程（两端通用）
+function invoke(target, method, args, sig, opts) {
     if (!B) { throw new Error('NativeBridge 不可用'); }
     const r = JSON.parse(B.Invoke(String(target), method,
-        JSON.stringify((args || []).map(arg)), '', ''));
+        JSON.stringify((args || []).map(arg)), sig || '', opts || ''));
     if (r.t === 'e') throw new Error(r.v);
     return r.v;
 }
 
-// 平台判断：沿用 Main_demo.js 的写法 —— 调一个 iOS 独有的类，抛错就是 Android。
+// 平台判断：沿用 Main_demo.js 的写法 —— 调一个 iOS 独有的 Foundation 类，抛错就是 Android。
 // 不额外加原生接口。B 不可用时也按 Android 处理（容器照常显示）。
+// 显式 thread=current：纯数据类不碰 View，且不能让平台判断依赖尚未真机验证的
+// UI 线程切换（否则 Android 上一旦切换失败，iOS 也会被误判）。
 let IS_IOS = false;
-try { invoke('NSProcessInfo', 'processInfo', []); IS_IOS = true; } catch (e) { }
+try {
+    invoke('NSProcessInfo', 'processInfo', [], '', 'thread=current');
+    IS_IOS = true;
+} catch (e) { }
 
 const URL = 'https://hk.keyso.uk/youtube-embed-api-demo.html?autoplay=1';
 
@@ -68,10 +75,9 @@ try {
     btnSlot.SetPosition(new UE.Vector2D(p.X + s.X - 64, p.Y - 32));
     btn.OnClicked.Add(function () { w.RemoveFromViewport(); });
 
-    // ---- 以下原生视图逻辑仅 iOS 执行 ----
-    // Android 走到这里只保留上面的容器 + 右上角 ✕（空容器），不碰任何 iOS/ObjC 类
+    // ---- ②① 分平台实现；③ maskView 只在 iOS 分支内 ----
     if (IS_IOS) {
-    // ---- ② 取 UE 的视图层级，以及 IOSView 自己的 bounds/frame ----
+    // ---- ② iOS：取 UE 的视图层级，以及 IOSView 自己的 bounds/frame ----
     // 坐标基准统一用 IOSView（Metal 游戏层）的 iOS 屏幕点，不做任何 UE<->iOS 换算：
     //   maskView 及其子视图的坐标系 = IOSView.bounds
     //   WKWebView 的坐标系         = IOSView.superview.bounds
@@ -158,7 +164,54 @@ try {
 
     log('maskView 已设 版本 ' + VERSION);
     } else {
-        log('Android：仅展示空容器 版本 ' + VERSION);
+        // ---- ② Android：取 DecorView 尺寸（View 相关，走默认 = 同步切 UI 线程）----
+        let dw = 0, dh = 0;
+        try {
+            const win = invoke('@activity', 'getWindow', []);
+            const decor = invoke('#' + win, 'getDecorView', []);
+            dw = invoke('#' + decor, 'getWidth', []);
+            dh = invoke('#' + decor, 'getHeight', []);
+        } catch (e2) { log('Android 取尺寸失败: ' + e2); }
+        log('Android vp=' + Math.round(vp.X) + 'x' + Math.round(vp.Y)
+            + ' decor=' + dw + 'x' + dh);
+
+        // 纯数据调用对照：显式不切线程，验证新的 thread=current 通道确实生效
+        try {
+            const pkg = invoke('@activity', 'getPackageName', [], '', 'thread=current');
+            log('Android thread=current 包名=' + pkg);
+        } catch (e2) { log('Android thread=current 失败: ' + e2); }
+
+        // ---- ① Android：桥自己造 android.webkit.WebView，addContentView 放上层 ----
+        // 依赖桥新加的 RunOnUIThreadAndroid：invoke 默认同步切 UI 线程，
+        // 所以 WebView 构造 / WebSettings / addContentView 全在 UI 线程执行。
+        // 不再用 UE.WebBrowser —— 它的层级被引擎写死在上层，下一步没法改到底层。
+        // 用 DecorView 的 Context（Activity 主题），不要用 ApplicationContext：
+        // WebView 里的媒体/全屏需要 Activity 主题，ApplicationContext 会踩坑
+        let actCtx = 0;
+        try {
+            const win = invoke('@activity', 'getWindow', []);
+            const decor = invoke('#' + win, 'getDecorView', []);
+            actCtx = invoke('#' + decor, 'getContext', []);
+        } catch (e2) { actCtx = invoke('@activity', 'getApplicationContext', []); }
+        const awv = invoke('android.webkit.WebView', '<init>', [h(actCtx)]);
+        const ws  = invoke('#' + awv, 'getSettings', []);
+        invoke('#' + ws, 'setJavaScriptEnabled', [true]);
+        invoke('#' + ws, 'setDomStorageEnabled', [true]);
+        try { invoke('#' + ws, 'setMediaPlaybackRequiresUserGesture', [false]); } catch (e2) { }
+
+        // 0.618 居中，与 UMG 容器同一视觉位置；只用 Android 屏幕点，不做 UE<->Android 换算
+        const gap = 3;
+        const aw = Math.max(1, dw * 0.618 - gap * 2), ah = Math.max(1, dh * 0.618 - gap * 2);
+        const ax = (dw - aw) / 2, ay = (dh - ah) / 2;
+        // FrameLayout$LayoutParams(int,int,int) 是唯一的三参构造，避开两参重载歧义
+        const lp = invoke('android.widget.FrameLayout$LayoutParams', '<init>',
+            [Math.round(aw), Math.round(ah), 0]);
+        invoke('#' + lp, 'setMargins', [Math.round(ax), Math.round(ay), 0, 0]);
+        invoke('@activity', 'addContentView', [h(awv), h(lp)]);
+        invoke('#' + awv, 'loadUrl', [URL]);
+
+        log('Android WebView=' + awv + ' frame=' + [ax, ay, aw, ah].map(Math.round).join(','));
+        log('Android：桥造 WebView 已加到上层 版本 ' + VERSION);
     }
 } catch (e) {
     log('错误: ' + e);
