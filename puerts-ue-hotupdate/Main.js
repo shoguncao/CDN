@@ -1,8 +1,8 @@
-// Main.js 5.7.5 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
+// Main.js 5.7.6 —— maskView 挖洞方案（iOS）/ 桥造 WebView（Android）
 // iOS：网页放最底层，IOSView 挖洞露出它，洞内给关闭按钮「留岛」
 // Android：桥造 android.webkit.WebView + addContentView 放上层（先可见，下一步改下层）
 // 依赖桥新加的 RunOnUIThreadAndroid：invoke 默认切 UI 线程，thread=current 不切
-const VERSION = '5.7.5';
+const VERSION = '5.7.6';
 
 let world = puerts.argv.getByName('World');
 const PAD = ' '.repeat(24);
@@ -164,16 +164,26 @@ try {
 
     log('maskView 已设 版本 ' + VERSION);
     } else {
-        // ---- ② Android：取 DecorView 尺寸（View 相关，走默认 = 同步切 UI 线程）----
+        // ---- ② Android：取 android:id/content 的真实尺寸 ----
+        // addContentView 把 WebView 加到的是 content 容器，不是 DecorView。
+        // 实测 NE2210 横屏：DecorView=2960x1440，content=2834x1440
+        // （右侧 126px 是系统导航栏）。UMG 的 SurfaceView 与 content 同区，
+        // 若按 DecorView 尺寸算 0.618 居中会整体右偏 63px。
         let dw = 0, dh = 0;
         try {
             const win = invoke('@activity', 'getWindow', []);
             const decor = invoke('#' + win, 'getDecorView', []);
-            dw = invoke('#' + decor, 'getWidth', []);
-            dh = invoke('#' + decor, 'getHeight', []);
+            // android.R.id.content = 0x01020002 = 16908290
+            let base = decor;
+            try {
+                const content = invoke('#' + decor, 'findViewById', [16908290]);
+                if (content) { base = content; }
+            } catch (e3) { }
+            dw = invoke('#' + base, 'getWidth', []);
+            dh = invoke('#' + base, 'getHeight', []);
         } catch (e2) { log('Android 取尺寸失败: ' + e2); }
         log('Android vp=' + Math.round(vp.X) + 'x' + Math.round(vp.Y)
-            + ' decor=' + dw + 'x' + dh);
+            + ' content=' + dw + 'x' + dh);
 
         // 纯数据调用对照：显式不切线程，验证新的 thread=current 通道确实生效
         try {
